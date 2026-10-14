@@ -1,0 +1,13 @@
+name = "iahack"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+[ai]
+binding = "AI"
+
+# Variáveis opcionais (defina no painel da Cloudflare ou com `wrangler pages secret put`):
+#   ANTHROPIC_API_KEY  habilita os modelos Claude (secret)
+#   ACCESS_CODE        exige um código de acesso para usar a API (secret)
+#   CF_PAID_PLAN       "true" libera DeepSeek V4 Pro, Kimi K2.6 e GLM 5.3 (plano Workers Paid)
+#   DEFAULT_MODEL      id do modelo padrão (ex.: "sentinel", "claude-opus")
