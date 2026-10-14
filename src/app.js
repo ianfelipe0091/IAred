@@ -13,9 +13,12 @@ const els = {
   composer: $("#composer"),
   input: $("#input"),
   send: $("#send"),
+  toBottom: $("#to-bottom"),
+  starters: $("#starters"),
   chatTitle: $("#chat-title"),
   engineLabel: $("#engine-label"),
   engineSub: $("#engine-sub"),
+  engineDot: $("#engine-dot"),
   settings: $("#settings"),
   apiKey: $("#api-key"),
   keyStatus: $("#key-status"),
@@ -23,6 +26,14 @@ const els = {
 };
 
 const CLAUDE_LABEL = "Claude Opus 5.5";
+const MOBILE = matchMedia("(max-width: 820px)");
+
+const STARTERS = [
+  { icon: "shield", title: "Blindar um servidor Linux exposto à internet", prompt: "Quais são os passos essenciais para blindar um servidor Linux (Ubuntu 24.04) exposto à internet? Priorize por impacto e inclua os comandos." },
+  { icon: "radar", title: "Triagem de um alerta suspeito no endpoint", prompt: "Recebi um alerta de PowerShell codificado em um endpoint Windows. Qual é o passo a passo de triagem para confirmar ou descartar um incidente?" },
+  { icon: "bug", title: "Revisar código em busca de vulnerabilidades", prompt: 'Revise este endpoint e aponte as vulnerabilidades com a correção:\n\n```python\n@app.route("/user")\ndef user():\n    uid = request.args.get("id")\n    cur.execute(f"SELECT * FROM users WHERE id = {uid}")\n    return jsonify(cur.fetchall())\n```' },
+  { icon: "siren", title: "Plano de resposta a ransomware", prompt: "Monte um plano de resposta a incidente de ransomware para uma empresa de 100 pessoas, detalhando as primeiras 24 horas." },
+];
 
 const state = {
   chatId: null,
@@ -37,8 +48,8 @@ function toast(text, kind = "info") {
   el.className = `toast ${kind}`;
   el.textContent = text;
   els.toasts.appendChild(el);
-  setTimeout(() => el.classList.add("out"), 3000);
-  setTimeout(() => el.remove(), 3400);
+  setTimeout(() => el.classList.add("out"), 2800);
+  setTimeout(() => el.remove(), 3200);
 }
 
 function copyText(text) {
@@ -53,6 +64,7 @@ function copyText(text) {
 }
 
 const currentChat = () => (state.chatId ? store.getChat(state.chatId) : null);
+const orb = (extra = "") => `<div class="orb ${extra}" aria-hidden="true"><span></span></div>`;
 
 function headers() {
   const h = { "content-type": "application/json" };
@@ -69,9 +81,12 @@ function persist() {
 // ---------------- Modelo ativo ----------------
 
 function renderEngine() {
-  const label = store.apiKey ? CLAUDE_LABEL : state.defaultLabel;
-  els.engineLabel.textContent = label;
-  els.engineSub.textContent = store.apiKey ? `${CLAUDE_LABEL} · sua chave` : `${state.defaultLabel} · sem chave`;
+  const claude = Boolean(store.apiKey);
+  els.engineLabel.textContent = claude ? CLAUDE_LABEL : state.defaultLabel;
+  els.engineSub.textContent = claude ? CLAUDE_LABEL : `${state.defaultLabel} · sem chave`;
+  els.engineDot.classList.toggle("on", claude);
+  $("#plan-free").classList.toggle("active", !claude);
+  $("#plan-claude").classList.toggle("active", claude);
 }
 
 async function loadEngine() {
@@ -84,17 +99,17 @@ async function loadEngine() {
   renderEngine();
 }
 
-// ---------------- Histórico ----------------
+// ---------------- Barra lateral ----------------
 
 function renderHistory() {
   const chats = store.chats.filter((c) => c.messages.length).sort((a, b) => b.updatedAt - a.updatedAt);
   if (!chats.length) {
-    els.history.innerHTML = `<p class="history-empty">Suas conversas aparecerão aqui.</p>`;
+    els.history.innerHTML = `<p class="history-empty">Nenhuma conversa ainda.</p>`;
     return;
   }
   els.history.innerHTML = chats
     .map(
-      (c) => `<div class="h-item ${c.id === state.chatId ? "active" : ""}">
+      (c) => `<div class="h-item ${c.id === state.chatId ? "active" : ""} ${state.streaming?.chatId === c.id ? "live" : ""}">
         <button class="h-open" data-open="${c.id}" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</button>
         <button class="h-del" data-delete="${c.id}" title="Apagar" aria-label="Apagar conversa">${icon("trash")}</button>
       </div>`,
@@ -114,21 +129,20 @@ els.history.addEventListener("click", (e) => {
     renderHistory();
   } else if (open) {
     openChat(open.dataset.open);
-    closeSidebar();
+    closeDrawer();
   }
 });
 
-els.chatTitle.addEventListener("click", () => {
-  const chat = currentChat();
-  if (!chat?.messages.length) return;
-  const title = prompt("Nome da conversa:", chat.title);
-  if (title?.trim()) {
-    chat.title = title.trim().slice(0, 80);
-    els.chatTitle.textContent = chat.title;
-    persist();
-    renderHistory();
-  }
-});
+function setCollapsed(collapsed) {
+  els.app.classList.toggle("collapsed", collapsed);
+  store.setPref("collapsed", collapsed);
+}
+
+const closeDrawer = () => els.app.classList.remove("sidebar-open");
+
+$("#collapse").addEventListener("click", () => (MOBILE.matches ? closeDrawer() : setCollapsed(true)));
+$("#open-sidebar").addEventListener("click", () => (MOBILE.matches ? els.app.classList.add("sidebar-open") : setCollapsed(false)));
+$("#scrim").addEventListener("click", closeDrawer);
 
 // ---------------- Conversas ----------------
 
@@ -145,7 +159,8 @@ function newChat() {
   history.replaceState(null, "", location.pathname);
   greet();
   renderHistory();
-  els.input.focus();
+  updateToBottom();
+  if (!MOBILE.matches) els.input.focus();
 }
 
 function openChat(id) {
@@ -171,6 +186,30 @@ function ensureChat() {
   return chat;
 }
 
+els.chatTitle.addEventListener("click", () => {
+  const chat = currentChat();
+  if (!chat?.messages.length) return;
+  const title = prompt("Nome da conversa:", chat.title);
+  if (title?.trim()) {
+    chat.title = title.trim().slice(0, 80);
+    els.chatTitle.textContent = chat.title;
+    persist();
+    renderHistory();
+  }
+});
+
+for (const id of ["#new-chat", "#new-chat-top"]) {
+  $(id).addEventListener("click", () => {
+    newChat();
+    closeDrawer();
+  });
+}
+$("#brand-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  newChat();
+  closeDrawer();
+});
+
 // ---------------- Mensagens ----------------
 
 function renderMessage(msg) {
@@ -186,15 +225,17 @@ function renderMessage(msg) {
       </div>`;
   } else {
     el.innerHTML = `
-      <div class="thinking-slot"></div>
-      <div class="content prose"></div>
-      <div class="notices"></div>
-      <div class="msg-foot">
-        <span class="live-mark">${icon("logo")}</span>
-        <div class="msg-actions">
-          <button data-act="copy" title="Copiar">${icon("copy")}</button>
-          <button data-act="regen" title="Gerar novamente">${icon("refresh")}</button>
-          <span class="msg-meta"></span>
+      ${orb()}
+      <div class="msg-body">
+        <div class="thinking-slot"></div>
+        <div class="content prose"></div>
+        <div class="notices"></div>
+        <div class="msg-foot">
+          <div class="msg-actions">
+            <button data-act="copy" title="Copiar">${icon("copy")}</button>
+            <button data-act="regen" title="Gerar novamente">${icon("refresh")}</button>
+            <span class="msg-meta"></span>
+          </div>
         </div>
       </div>`;
     updateAssistant(el, msg);
@@ -206,6 +247,7 @@ function updateAssistant(el, msg) {
   const live = state.streaming?.msgId === msg.id;
   el.classList.toggle("live", live);
 
+  // Raciocínio
   const slot = el.querySelector(".thinking-slot");
   if (msg.thinking) {
     let details = slot.querySelector("details");
@@ -215,14 +257,18 @@ function updateAssistant(el, msg) {
     }
     const thinkingNow = live && !msg.content;
     const secs = msg.thinkingMs ? Math.max(1, Math.round(msg.thinkingMs / 1000)) : 0;
-    details.querySelector(".t-label").textContent = thinkingNow ? "Pensando" : secs ? `Pensou por ${secs}s` : "Pensamento";
+    details.querySelector(".t-label").textContent = thinkingNow ? "Raciocinando" : secs ? `Raciocinou por ${secs}s` : "Raciocínio";
     details.classList.toggle("active", thinkingNow);
     details.querySelector(".t-body").textContent = msg.thinking;
   } else {
     slot.innerHTML = "";
   }
 
-  el.querySelector(".content").innerHTML = msg.content ? renderMarkdown(msg.content) : "";
+  // Conteúdo
+  const content = el.querySelector(".content");
+  if (msg.content) content.innerHTML = renderMarkdown(msg.content);
+  else if (live && !msg.thinking) content.innerHTML = `<div class="pending"><span class="shimmer">Pensando…</span></div>`;
+  else content.innerHTML = "";
 
   el.querySelector(".notices").innerHTML = [
     ...(msg.notices || []).map((n) => `<div class="notice">${escapeHtml(n)}</div>`),
@@ -320,6 +366,7 @@ async function runAssistant(chat) {
   chat.messages.push(msg);
   els.messages.appendChild(renderMessage(msg));
   setBusy(true);
+  renderHistory();
   scrollToBottom(true);
 
   let frame = 0;
@@ -330,6 +377,7 @@ async function runAssistant(chat) {
     const stick = nearBottom();
     updateAssistant(target, msg);
     if (stick) scrollToBottom();
+    updateToBottom();
   };
   const schedule = () => {
     if (!frame) frame = requestAnimationFrame(paint);
@@ -419,6 +467,7 @@ function setBusy(busy) {
   els.app.classList.toggle("is-busy", busy);
   els.send.innerHTML = icon(busy ? "stop" : "arrow-up");
   els.send.setAttribute("aria-label", busy ? "Parar" : "Enviar");
+  els.send.title = busy ? "Parar (Esc)" : "Enviar (Enter)";
   updateSend();
 }
 
@@ -430,7 +479,7 @@ function updateSend() {
 
 function autosize(ta) {
   ta.style.height = "auto";
-  ta.style.height = `${Math.min(ta.scrollHeight, 300)}px`;
+  ta.style.height = `${Math.min(ta.scrollHeight, 280)}px`;
 }
 
 els.input.addEventListener("input", () => {
@@ -439,7 +488,7 @@ els.input.addEventListener("input", () => {
 });
 
 els.input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !MOBILE.matches) {
     e.preventDefault();
     els.composer.requestSubmit();
   }
@@ -458,6 +507,17 @@ els.composer.addEventListener("submit", (e) => {
   sendMessage(text);
 });
 
+els.starters.innerHTML = STARTERS.map(
+  (s, i) => `<button class="starter" data-starter="${i}">${icon(s.icon)}<span>${escapeHtml(s.title)}</span></button>`,
+).join("");
+els.starters.querySelectorAll(".starter").forEach((b, i) => b.style.setProperty("--i", i));
+els.starters.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-starter]");
+  if (b) sendMessage(STARTERS[Number(b.dataset.starter)].prompt);
+});
+
+// ---------------- Rolagem ----------------
+
 function nearBottom() {
   const t = els.thread;
   return t.scrollHeight - t.scrollTop - t.clientHeight < 140;
@@ -466,6 +526,15 @@ function nearBottom() {
 function scrollToBottom(force = false) {
   if (force || nearBottom()) els.thread.scrollTop = els.thread.scrollHeight;
 }
+
+function updateToBottom() {
+  els.toBottom.classList.toggle("show", !els.app.classList.contains("is-empty") && !nearBottom());
+}
+
+els.thread.addEventListener("scroll", updateToBottom, { passive: true });
+els.toBottom.addEventListener("click", () => {
+  els.thread.scrollTo({ top: els.thread.scrollHeight, behavior: "smooth" });
+});
 
 // ---------------- Configurações (chave da API) ----------------
 
@@ -478,13 +547,22 @@ function openSettings() {
   els.apiKey.value = store.apiKey;
   els.apiKey.type = "password";
   $("#toggle-key").innerHTML = icon("eye");
-  setKeyStatus(store.apiKey ? `Conectado: ${CLAUDE_LABEL}` : "", store.apiKey ? "ok" : "");
+  setKeyStatus(store.apiKey ? `Conectado ao ${CLAUDE_LABEL}.` : "", store.apiKey ? "ok" : "");
+  renderEngine();
   els.settings.showModal();
-  closeSidebar();
+  closeDrawer();
 }
 
 $("#open-settings").addEventListener("click", openSettings);
 $("#engine-btn").addEventListener("click", openSettings);
+$("#plan-claude").addEventListener("click", () => els.apiKey.focus());
+$("#plan-free").addEventListener("click", () => {
+  if (!store.apiKey) return;
+  store.setApiKey("");
+  els.apiKey.value = "";
+  setKeyStatus("Usando o modelo gratuito.");
+  renderEngine();
+});
 
 $("#toggle-key").addEventListener("click", (e) => {
   const show = els.apiKey.type === "password";
@@ -511,7 +589,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
     store.setApiKey(key);
     renderEngine();
     els.settings.close();
-    toast(`Conectado ao ${CLAUDE_LABEL}.`);
+    toast(`Conectado ao ${CLAUDE_LABEL}`);
   } catch (err) {
     setKeyStatus(err.message, "error");
   } finally {
@@ -539,25 +617,15 @@ els.settings.addEventListener("click", (e) => {
   if (e.target === els.settings || e.target.closest("[data-close]")) els.settings.close();
 });
 
-// ---------------- Navegação ----------------
-
-const closeSidebar = () => els.app.classList.remove("sidebar-open");
-$("#open-sidebar").addEventListener("click", () => els.app.classList.add("sidebar-open"));
-$("#close-sidebar").addEventListener("click", closeSidebar);
-$("#scrim").addEventListener("click", closeSidebar);
-$("#new-chat").addEventListener("click", () => {
-  newChat();
-  closeSidebar();
-});
-$("#brand-link").addEventListener("click", (e) => {
-  e.preventDefault();
-  newChat();
-});
+// ---------------- Atalhos ----------------
 
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
     newChat();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b" && !MOBILE.matches) {
+    e.preventDefault();
+    setCollapsed(!els.app.classList.contains("collapsed"));
   } else if (e.key === "Escape" && state.streaming && !els.settings.open) {
     state.streaming.controller.abort();
   }
@@ -566,6 +634,7 @@ document.addEventListener("keydown", (e) => {
 // ---------------- Início ----------------
 
 hydrateIcons();
+if (store.getPref("collapsed") && !MOBILE.matches) els.app.classList.add("collapsed");
 setBusy(false);
 renderEngine();
 loadEngine();

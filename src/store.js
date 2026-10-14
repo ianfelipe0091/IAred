@@ -50,6 +50,14 @@ export const store = {
     }
   },
 
+  getPref(name) {
+    return read(`iahack:pref:${name}`, null);
+  },
+
+  setPref(name, value) {
+    write(`iahack:pref:${name}`, value);
+  },
+
   getChat(id) {
     return this.chats.find((c) => c.id === id) || null;
   },

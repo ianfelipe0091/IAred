@@ -5,69 +5,83 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>IAHack — IA para Cibersegurança</title>
   <meta name="description" content="IAHack: assistente de IA especialista em cibersegurança." />
-  <meta name="theme-color" content="#f7f8f4" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#232523" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0c0e0d" media="(prefers-color-scheme: dark)" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
 <body>
   <div class="app is-empty" id="app">
+    <!-- Barra lateral -->
     <aside class="sidebar" id="sidebar" aria-label="Conversas">
-      <div class="sidebar-head">
+      <div class="sb-head">
         <a class="brand" href="/" id="brand-link" aria-label="IAHack — início">
-          <span class="brand-mark" data-icon="logo"></span>
+          <span class="logo"></span>
           <span class="brand-name">IAHack</span>
         </a>
-        <button class="icon-btn only-mobile" id="close-sidebar" aria-label="Fechar menu" data-icon="close"></button>
+        <button class="icon-btn" id="collapse" title="Recolher barra lateral" aria-label="Recolher barra lateral" data-icon="sidebar"></button>
       </div>
-      <button class="new-chat" id="new-chat"><span class="new-chat-icon" data-icon="plus"></span>Nova conversa</button>
-      <div class="h-label">Recentes</div>
+
+      <button class="sb-new" id="new-chat">
+        <span data-icon="compose"></span>
+        <span class="sb-text">Nova conversa</span>
+      </button>
+
+      <div class="sb-section sb-text">Recentes</div>
       <nav class="history" id="history"></nav>
-      <button class="settings-btn" id="open-settings">
-        <span class="settings-icon" data-icon="settings"></span>
-        <span class="settings-text">
+
+      <button class="sb-settings" id="open-settings">
+        <span class="sb-settings-icon" data-icon="key"></span>
+        <span class="sb-text sb-settings-text">
           <span>Configurações</span>
-          <small id="engine-sub">Modelo gratuito</small>
+          <small><i class="dot" id="engine-dot"></i><span id="engine-sub">Modelo gratuito</span></small>
         </span>
       </button>
     </aside>
     <div class="scrim" id="scrim"></div>
 
+    <!-- Área principal -->
     <main class="main">
       <header class="topbar">
-        <button class="icon-btn only-mobile" id="open-sidebar" aria-label="Abrir menu" data-icon="menu"></button>
+        <button class="icon-btn tb-toggle" id="open-sidebar" aria-label="Abrir barra lateral" data-icon="sidebar"></button>
+        <button class="icon-btn tb-new" id="new-chat-top" aria-label="Nova conversa" title="Nova conversa" data-icon="compose"></button>
         <button class="chat-title" id="chat-title" title="Renomear conversa"></button>
-        <span class="topbar-spacer"></span>
       </header>
 
       <section class="thread" id="thread">
         <div class="welcome" id="welcome">
-          <span class="welcome-mark" data-icon="logo"></span>
-          <h1 id="greeting">Boa noite</h1>
+          <div class="orb orb-xl" aria-hidden="true"><span></span></div>
+          <h1>
+            <span class="grad-text" id="greeting">Boa noite</span>
+            <span class="welcome-sub">Como posso ajudar na sua segurança hoje?</span>
+          </h1>
         </div>
         <div class="messages" id="messages" aria-live="polite"></div>
       </section>
 
       <div class="dock">
+        <button class="to-bottom" id="to-bottom" aria-label="Ir para o fim" data-icon="arrow-down"></button>
         <form class="composer" id="composer">
-          <textarea id="input" rows="1" placeholder="Como posso ajudar na sua segurança hoje?" aria-label="Mensagem"></textarea>
+          <textarea id="input" rows="1" placeholder="Pergunte qualquer coisa sobre segurança…" aria-label="Mensagem"></textarea>
           <div class="composer-bar">
-            <button type="button" class="engine-btn" id="engine-btn" title="Trocar modelo / colar chave da API">
-              <span id="engine-label">IAHack Free</span><span data-icon="chevron"></span>
+            <button type="button" class="model-chip" id="engine-btn" title="Modelo e chave da API">
+              <span data-icon="sparkle"></span><span id="engine-label">IAHack Free</span><span data-icon="chevron"></span>
             </button>
-            <button type="submit" class="send" id="send" aria-label="Enviar" data-icon="arrow-up"></button>
+            <button type="submit" class="send" id="send" aria-label="Enviar"></button>
           </div>
         </form>
-        <p class="disclaimer">O IAHack pode cometer erros. Use apenas em sistemas que você tem autorização para testar.</p>
+        <div class="starters" id="starters"></div>
+        <p class="disclaimer">A IA pode cometer erros. Use apenas em sistemas que você tem autorização para testar.</p>
       </div>
     </main>
   </div>
 
+  <!-- Configurações -->
   <dialog class="modal" id="settings">
     <form class="modal-card" method="dialog" id="settings-form">
       <header class="modal-head">
@@ -75,23 +89,34 @@
         <button type="button" class="icon-btn" data-close aria-label="Fechar" data-icon="close"></button>
       </header>
 
-      <section class="modal-section">
-        <h3>Chave da API</h3>
-        <p class="hint">Cole sua chave da Anthropic para usar o <b>Claude Opus 5.5</b>. Sem chave, o IAHack usa o modelo gratuito.</p>
+      <div class="modal-body">
+        <p class="field-label">Modelo de IA</p>
+        <div class="plans">
+          <div class="plan" id="plan-free">
+            <span class="plan-icon" data-icon="bolt"></span>
+            <span class="plan-text"><b>IAHack Free</b><small>Nemotron 3 120B · grátis, sem configurar</small></span>
+            <span class="plan-check" data-icon="check"></span>
+          </div>
+          <div class="plan" id="plan-claude">
+            <span class="plan-icon plan-icon-ai" data-icon="sparkle"></span>
+            <span class="plan-text"><b>Claude Opus 5.5</b><small>Mais inteligente · usa sua chave da Anthropic</small></span>
+            <span class="plan-check" data-icon="check"></span>
+          </div>
+        </div>
+
+        <label class="field-label" for="api-key">Chave da API da Anthropic</label>
         <div class="key-field">
-          <input id="api-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+          <span data-icon="key"></span>
+          <input id="api-key" type="password" placeholder="Cole aqui: sk-ant-..." autocomplete="off" spellcheck="false" />
           <button type="button" class="icon-btn" id="toggle-key" aria-label="Mostrar chave" data-icon="eye"></button>
         </div>
         <p class="key-status" id="key-status"></p>
-        <p class="hint small">A chave fica salva só neste navegador e é usada apenas para responder às suas mensagens. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">Criar uma chave</a></p>
-      </section>
-
-      <section class="modal-section">
-        <h3>Dados</h3>
-        <button type="button" class="link-danger" id="clear-all">Apagar todas as conversas</button>
-      </section>
+        <p class="hint">A chave fica salva só neste navegador e é usada apenas para gerar as respostas. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">Criar uma chave ↗</a></p>
+      </div>
 
       <footer class="modal-foot">
+        <button type="button" class="link-danger" id="clear-all">Apagar conversas</button>
+        <span class="foot-spacer"></span>
         <button type="button" class="btn ghost" id="remove-key">Remover chave</button>
         <button type="submit" class="btn primary" id="save-key">Salvar</button>
       </footer>

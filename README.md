@@ -19,6 +19,8 @@ Também é possível definir uma chave padrão para todos os visitantes com o se
 - Raciocínio do modelo visível em um bloco recolhível.
 - Histórico local de conversas com títulos automáticos.
 - Editar mensagem, gerar novamente e parar a resposta (Esc).
+- Visual de produto de IA: orb animado como "presença" da IA, composer flutuante com anel em gradiente enquanto a resposta é gerada e sugestões iniciais.
+- Barra lateral recolhível (Ctrl+B), nova conversa (Ctrl+K), botão de voltar ao fim da conversa.
 - Tema claro/escuro automático (segue o sistema) e layout para celular.
 - Cabeçalhos de segurança (CSP restritiva, HSTS, X-Frame-Options) e saída sanitizada com DOMPurify.
 

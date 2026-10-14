@@ -1,8 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#2f7a52"/>
-  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 11 15.5 17.3v12.2c0 10.4 7.1 18 16.5 20.8 9.4-2.8 16.5-10.4 16.5-20.8V17.3L32 11Z" stroke-width="3.6"/>
-    <path d="m24.5 26.5 6 5-6 5" stroke-width="3.8"/>
-    <path d="M34 38.5h7" stroke-width="3.8"/>
-  </g>
+  <defs>
+    <linearGradient id="a" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset=".45" stop-color="#2dd4bf"/>
+      <stop offset=".75" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#a3e635"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="#0c0e0d"/>
+  <path d="M32 9.5 15 16v12.3C15 39.1 22.3 47 32 50c9.7-3 17-10.9 17-21.7V16L32 9.5Z" fill="none" stroke="url(#a)" stroke-width="3.8" stroke-linejoin="round"/>
+  <path d="M32 19.5c.9 5.6 4.8 9.5 10.4 10.4-5.6.9-9.5 4.8-10.4 10.4-.9-5.6-4.8-9.5-10.4-10.4 5.6-.9 9.5-4.8 10.4-10.4Z" fill="url(#a)"/>
 </svg>
