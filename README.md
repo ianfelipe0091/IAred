@@ -2,7 +2,7 @@
 
 Assistente de IA no estilo Claude, especialista em segurança da informação, rodando na Cloudflare (Pages + Pages Functions + Workers AI).
 
-**Produção:** https://kira-cb0.pages.dev (também em https://iahack.pages.dev)
+**Produção:** https://kira-cb0.pages.dev
 
 ## Como funciona
 
