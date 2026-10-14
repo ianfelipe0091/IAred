@@ -1,6 +1,12 @@
 // Persistência local (apenas neste navegador).
 const KEY_CHATS = "iahack:chats";
-const KEY_API = "iahack:apiKey";
+
+// A chave da API agora é definida só pelo administrador: apaga a que o usuário tinha colado.
+try {
+  localStorage.removeItem("iahack:apiKey");
+} catch {
+  // ignora
+}
 
 function read(key, fallback) {
   try {
@@ -25,7 +31,6 @@ export const uid = () =>
 
 export const store = {
   chats: read(KEY_CHATS, []),
-  apiKey: read(KEY_API, ""),
 
   saveChats() {
     if (write(KEY_CHATS, this.chats)) return true;
@@ -36,18 +41,6 @@ export const store = {
       if (write(KEY_CHATS, this.chats)) return "trimmed";
     }
     return false;
-  },
-
-  setApiKey(value) {
-    this.apiKey = value;
-    if (value) write(KEY_API, value);
-    else {
-      try {
-        localStorage.removeItem(KEY_API);
-      } catch {
-        // ignora
-      }
-    }
   },
 
   getPref(name) {

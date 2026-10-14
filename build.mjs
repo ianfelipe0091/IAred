@@ -23,7 +23,7 @@ const common = {
 
 const app = await build({
   ...common,
-  entryPoints: { app: "src/app.js", style: "src/styles.css" },
+  entryPoints: { app: "src/app.js", style: "src/styles.css", admin: "src/admin.js", panel: "src/admin.css" },
   format: "esm",
 });
 
@@ -36,11 +36,18 @@ const find = (prefix, ext) => {
 
 const css = find("style", ".css");
 const js = find("app", ".js");
+const adminCss = find("panel", ".css");
+const adminJs = find("admin", ".js");
 
-let html = await readFile("src/index.html", "utf8");
-html = html.replace("/assets/app.css", css).replace("/assets/app.js", js);
-await writeFile(path.join(OUT, "index.html"), html);
+// Cada página HTML aponta para os arquivos com hash.
+const page = async (src, dest, swaps) => {
+  let html = await readFile(src, "utf8");
+  for (const [from, to] of swaps) html = html.replace(from, to);
+  await writeFile(path.join(OUT, dest), html);
+};
+await page("src/index.html", "index.html", [["/assets/app.css", css], ["/assets/app.js", js]]);
+await page("src/admin.html", "admin.html", [["/assets/admin.css", adminCss], ["/assets/admin.js", adminJs]]);
 
 await cp("public", OUT, { recursive: true });
 
-console.log(`\n✔ build pronto em ${OUT}/ → ${js}, ${css}`);
+console.log(`\n✔ build pronto em ${OUT}/ → ${js}, ${css}, ${adminJs}, ${adminCss}`);

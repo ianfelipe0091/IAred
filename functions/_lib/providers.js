@@ -1,18 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { loadAIConfig } from "./config.js";
 
-// Os dois provedores emitem os mesmos eventos para o frontend:
+// Todos os provedores emitem os mesmos eventos para o frontend:
 //   { type: "thinking", text }   trecho do raciocínio
 //   { type: "text", text }       trecho da resposta
 //   { type: "notice", text }     aviso curto
 //   { type: "usage", input, output }
-
-export const CLAUDE = {
-  id: "claude",
-  label: "Claude Opus 5.5",
-  model: "claude-opus-5-5",
-  maxTokens: 64000,
-  contextTokens: 900000,
-};
 
 export const FREE = {
   id: "free",
@@ -22,8 +15,56 @@ export const FREE = {
   contextTokens: 200000,
 };
 
-export function isAnthropicKey(key) {
-  return typeof key === "string" && /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key.trim());
+// Chave padrão antiga (secret ANTHROPIC_API_KEY), usada quando o painel não tem configuração.
+const LEGACY_CLAUDE = {
+  provider: "Anthropic",
+  format: "anthropic",
+  model: "claude-opus-5-5",
+  label: "Claude Opus 5.5",
+  contextTokens: 900000,
+  maxOutput: 64000,
+  options: { thinking: true, effort: "high", cache: true, fallbacks: true },
+};
+
+// Modelo que os usuários vão usar: o configurado no painel, a chave padrão antiga ou o gratuito.
+export async function resolveEngine(env) {
+  const config = (await loadAIConfig(env)) || (env.ANTHROPIC_API_KEY ? { ...LEGACY_CLAUDE, apiKey: env.ANTHROPIC_API_KEY } : null);
+  if (config) return engineFromConfig(config);
+  if (env.AI) {
+    return {
+      ...FREE,
+      stream: (args) => streamWorkersAI(env, args),
+      describeError: describeWorkersAIError,
+    };
+  }
+  return null;
+}
+
+export function engineFromConfig(config) {
+  const anthropic = config.format === "anthropic";
+  return {
+    id: anthropic ? "claude" : "custom",
+    label: config.label || config.model,
+    contextTokens: config.contextTokens || 128000,
+    maxTokens: config.maxOutput || 8192,
+    stream: (args) => (anthropic ? streamAnthropic(config, args) : streamChatCompletions(config, args)),
+    describeError: anthropic ? describeAnthropicError : describeHTTPError,
+  };
+}
+
+// As APIs exigem alternância user/assistant começando por user; mescla vizinhos iguais.
+function alternate(messages) {
+  const out = [];
+  for (const m of messages) {
+    const last = out[out.length - 1];
+    if (last && last.role === m.role) {
+      last.content += `\n\n${m.content}`;
+    } else {
+      out.push({ role: m.role, content: m.content });
+    }
+  }
+  while (out.length && out[0].role !== "user") out.shift();
+  return out;
 }
 
 // ---------- Workers AI (modelo gratuito) ----------
@@ -38,14 +79,78 @@ export async function* streamWorkersAI(env, { system, messages, signal }) {
     },
     { signal },
   );
-  yield* parseWorkersAIStream(stream);
+  yield* parseChatCompletionsStream(stream);
 }
 
-async function* parseWorkersAIStream(stream) {
+export function describeWorkersAIError(err) {
+  const msg = String(err?.message || err);
+  if (/daily free allocation|neurons|4006/i.test(msg)) {
+    return "A cota gratuita de hoje acabou. Tente novamente mais tarde.";
+  }
+  if (/context|too long|max.*tokens/i.test(msg)) {
+    return "A conversa ficou longa demais. Inicie uma nova conversa.";
+  }
+  return `Falha no modelo gratuito: ${msg.slice(0, 300)}`;
+}
+
+// ---------- APIs no formato da OpenAI (Chat Completions) ----------
+
+export class ProviderError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export async function providerError(res) {
+  const text = await res.text().catch(() => "");
+  let message = "";
+  try {
+    const data = JSON.parse(text);
+    const body = Array.isArray(data) ? data[0] : data;
+    message = body?.error?.message || body?.message || (typeof body?.error === "string" ? body.error : "");
+  } catch {
+    // corpo não é JSON
+  }
+  return new ProviderError(res.status, String(message || text || res.statusText).slice(0, 300));
+}
+
+export async function* streamChatCompletions(config, { system, messages, signal }) {
+  const res = await fetch(`${config.baseURL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "text/event-stream",
+      authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      stream: true,
+      messages: [{ role: "system", content: system }, ...alternate(messages)],
+    }),
+    signal,
+  });
+  if (!res.ok) throw await providerError(res);
+
+  // Alguns provedores ignoram stream e devolvem a resposta inteira.
+  if ((res.headers.get("content-type") || "").includes("application/json")) {
+    const data = await res.json();
+    const message = data?.choices?.[0]?.message || {};
+    const reasoning = message.reasoning_content ?? message.reasoning;
+    if (reasoning) yield { type: "thinking", text: reasoning };
+    if (message.content) yield { type: "text", text: message.content };
+    return;
+  }
+  if (!res.body) throw new ProviderError(res.status, "O provedor devolveu uma resposta vazia.");
+  yield* parseChatCompletionsStream(res.body);
+}
+
+async function* parseChatCompletionsStream(stream) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let usage = null;
+  let finish = null;
 
   try {
     while (true) {
@@ -65,6 +170,9 @@ async function* parseWorkersAIStream(stream) {
         } catch {
           continue;
         }
+        if (chunk.error) {
+          throw new ProviderError(0, String(chunk.error.message || chunk.error).slice(0, 300));
+        }
         if (chunk.usage && (!usage || (chunk.usage.total_tokens || 0) >= (usage.total_tokens || 0))) {
           usage = chunk.usage;
         }
@@ -74,6 +182,7 @@ async function* parseWorkersAIStream(stream) {
           const reasoning = delta.reasoning_content ?? delta.reasoning;
           if (reasoning) yield { type: "thinking", text: reasoning };
           if (delta.content) yield { type: "text", text: delta.content };
+          if (choice.finish_reason) finish = choice.finish_reason;
         } else if (typeof chunk.response === "string" && chunk.response) {
           yield { type: "text", text: chunk.response };
         }
@@ -83,41 +192,60 @@ async function* parseWorkersAIStream(stream) {
     reader.releaseLock();
   }
 
+  if (finish === "length") {
+    yield { type: "notice", text: "A resposta atingiu o limite de tamanho. Peça para continuar." };
+  } else if (finish === "content_filter") {
+    yield { type: "notice", text: "O provedor bloqueou parte da resposta pelo filtro de conteúdo." };
+  }
   if (usage) {
     yield { type: "usage", input: usage.prompt_tokens || 0, output: usage.completion_tokens || 0 };
   }
 }
 
-export function describeWorkersAIError(err) {
-  const msg = String(err?.message || err);
-  if (/daily free allocation|neurons|4006/i.test(msg)) {
-    return "A cota gratuita de hoje acabou. Conecte sua chave da API nas configurações para continuar.";
+export function describeHTTPError(err) {
+  if (!(err instanceof ProviderError)) {
+    return `Não foi possível conectar à API de IA: ${String(err?.message || err).slice(0, 200)}`;
   }
-  if (/context|too long|max.*tokens/i.test(msg)) {
-    return "A conversa ficou longa demais. Inicie uma nova conversa.";
+  const detail = err.message ? `: ${err.message}` : ".";
+  switch (true) {
+    case err.status === 401 || err.status === 403:
+      return `O provedor recusou o token da IA (HTTP ${err.status})${detail}`;
+    case err.status === 402:
+      return `A conta do provedor está sem créditos (HTTP 402)${detail}`;
+    case err.status === 404:
+      return `Modelo ou endereço não encontrado no provedor (HTTP 404)${detail}`;
+    case err.status === 429:
+      return "Limite de uso do provedor atingido. Aguarde alguns segundos e tente de novo.";
+    case err.status >= 500:
+      return `O provedor de IA está instável (HTTP ${err.status}). Tente de novo em instantes.`;
+    case err.status === 0:
+      return `O provedor interrompeu a resposta${detail}`;
+    default:
+      return `Requisição recusada pelo provedor (HTTP ${err.status})${detail}`;
   }
-  return `Falha no modelo gratuito: ${msg.slice(0, 300)}`;
 }
 
 // ---------- Anthropic (Claude) ----------
 
-export async function* streamAnthropic(apiKey, { system, messages, signal }) {
-  const client = new Anthropic({ apiKey });
+export async function* streamAnthropic(config, { system, messages, signal }) {
+  const client = new Anthropic({ apiKey: config.apiKey, baseURL: config.baseURL || undefined });
+  const options = config.options || {};
 
-  const stream = client.beta.messages.stream(
-    {
-      model: CLAUDE.model,
-      max_tokens: CLAUDE.maxTokens,
-      system,
-      messages: toAnthropicMessages(messages),
-      thinking: { type: "adaptive", display: "summarized" },
-      output_config: { effort: "high" },
-      cache_control: { type: "ephemeral" },
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-    },
-    { signal },
-  );
+  const params = {
+    model: config.model,
+    max_tokens: config.maxOutput || 16000,
+    system,
+    messages: alternate(messages),
+  };
+  if (options.thinking) params.thinking = { type: "adaptive", display: "summarized" };
+  if (options.effort) params.output_config = { effort: options.effort };
+  if (options.cache) params.cache_control = { type: "ephemeral" };
+  if (options.fallbacks) {
+    params.betas = ["server-side-fallback-2026-07-01"];
+    params.fallbacks = "default";
+  }
+
+  const stream = client.beta.messages.stream(params, { signal });
 
   for await (const event of stream) {
     if (event.type === "content_block_delta") {
@@ -148,42 +276,22 @@ export async function* streamAnthropic(apiKey, { system, messages, signal }) {
   };
 }
 
-// A API exige alternância user/assistant começando por user; mescla vizinhos iguais.
-function toAnthropicMessages(messages) {
-  const out = [];
-  for (const m of messages) {
-    const last = out[out.length - 1];
-    if (last && last.role === m.role) {
-      last.content += `\n\n${m.content}`;
-    } else {
-      out.push({ role: m.role, content: m.content });
-    }
-  }
-  while (out.length && out[0].role !== "user") out.shift();
-  return out;
-}
-
-export async function verifyAnthropicKey(apiKey) {
-  const client = new Anthropic({ apiKey, maxRetries: 0 });
-  await client.models.retrieve(CLAUDE.model);
-}
-
 export function describeAnthropicError(err) {
   if (err instanceof Anthropic.AuthenticationError) {
-    return "Chave da API inválida. Confira a chave nas configurações.";
+    return "O token da IA foi recusado pela Anthropic (chave inválida).";
   }
   if (err instanceof Anthropic.PermissionDeniedError) {
-    return "Esta chave não tem permissão para usar o Claude Opus 5.5.";
+    return "O token da IA não tem permissão para usar este modelo.";
   }
   if (err instanceof Anthropic.NotFoundError) {
-    return "Modelo não disponível para esta chave.";
+    return "Modelo não disponível para este token.";
   }
   if (err instanceof Anthropic.RateLimitError) {
-    return "Limite de uso da sua chave atingido. Aguarde alguns segundos e tente de novo.";
+    return "Limite de uso da API atingido. Aguarde alguns segundos e tente de novo.";
   }
   if (err instanceof Anthropic.BadRequestError) {
     if (/credit balance/i.test(err.message)) {
-      return "Sua conta da Anthropic está sem créditos. Adicione créditos no console da Anthropic.";
+      return "A conta da Anthropic está sem créditos. Adicione créditos no console da Anthropic.";
     }
     return `Requisição recusada: ${err.message}`;
   }

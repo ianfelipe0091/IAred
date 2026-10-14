@@ -20,12 +20,10 @@ const els = {
   engineSub: $("#engine-sub"),
   engineDot: $("#engine-dot"),
   settings: $("#settings"),
-  apiKey: $("#api-key"),
-  keyStatus: $("#key-status"),
+  modelName: $("#model-name"),
   toasts: $("#toasts"),
 };
 
-const CLAUDE_LABEL = "Claude Opus 5.5";
 const MOBILE = matchMedia("(max-width: 820px)");
 
 const STARTERS = [
@@ -38,7 +36,7 @@ const STARTERS = [
 const state = {
   chatId: null,
   streaming: null, // { controller, chatId, msgId }
-  defaultLabel: "KIRA Free",
+  model: { label: "KIRA Free", free: true },
 };
 
 // ---------------- Utilidades ----------------
@@ -66,11 +64,7 @@ function copyText(text) {
 const currentChat = () => (state.chatId ? store.getChat(state.chatId) : null);
 const orb = (extra = "") => `<div class="orb ${extra}" aria-hidden="true"><span></span></div>`;
 
-function headers() {
-  const h = { "content-type": "application/json" };
-  if (store.apiKey) h["x-api-key"] = store.apiKey;
-  return h;
-}
+const JSON_HEADERS = { "content-type": "application/json" };
 
 function persist() {
   const result = store.saveChats();
@@ -81,18 +75,20 @@ function persist() {
 // ---------------- Modelo ativo ----------------
 
 function renderEngine() {
-  const claude = Boolean(store.apiKey);
-  els.engineLabel.textContent = claude ? CLAUDE_LABEL : state.defaultLabel;
-  els.engineSub.textContent = claude ? CLAUDE_LABEL : `${state.defaultLabel} · sem chave`;
-  els.engineDot.classList.toggle("on", claude);
-  $("#plan-free").classList.toggle("active", !claude);
-  $("#plan-claude").classList.toggle("active", claude);
+  const { label, free } = state.model;
+  els.engineLabel.textContent = label;
+  els.engineSub.textContent = label;
+  els.modelName.textContent = label;
+  els.engineDot.classList.toggle("on", !free);
 }
 
 async function loadEngine() {
   try {
-    const res = await fetch("/api/key");
-    if (res.ok) state.defaultLabel = (await res.json()).default || state.defaultLabel;
+    const res = await fetch("/api/model");
+    if (res.ok) {
+      const data = await res.json();
+      state.model = { label: data.label || state.model.label, free: data.free !== false };
+    }
   } catch {
     // mantém o rótulo padrão
   }
@@ -387,7 +383,7 @@ async function runAssistant(chat) {
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
-      headers: headers(),
+      headers: JSON_HEADERS,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -418,8 +414,11 @@ async function runAssistant(chat) {
         } catch {
           continue;
         }
-        if (ev.type === "meta") msg.modelLabel = ev.label;
-        else if (ev.type === "thinking") {
+        if (ev.type === "meta") {
+          msg.modelLabel = ev.label;
+          state.model = { label: ev.label, free: ev.model === "free" };
+          renderEngine();
+        } else if (ev.type === "thinking") {
           if (!thinkStart) thinkStart = Date.now();
           msg.thinking += ev.text;
         } else if (ev.type === "text") {
@@ -450,7 +449,7 @@ async function generateTitle(chat, text) {
   if (state.chatId === chat.id) els.chatTitle.textContent = chat.title;
   renderHistory();
   try {
-    const res = await fetch("/api/title", { method: "POST", headers: headers(), body: JSON.stringify({ text }) });
+    const res = await fetch("/api/title", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ text }) });
     const { title } = await res.json();
     if (title) {
       chat.title = title;
@@ -536,18 +535,9 @@ els.toBottom.addEventListener("click", () => {
   els.thread.scrollTo({ top: els.thread.scrollHeight, behavior: "smooth" });
 });
 
-// ---------------- Configurações (chave da API) ----------------
-
-function setKeyStatus(text, kind = "") {
-  els.keyStatus.textContent = text;
-  els.keyStatus.className = `key-status ${kind}`;
-}
+// ---------------- Configurações ----------------
 
 function openSettings() {
-  els.apiKey.value = store.apiKey;
-  els.apiKey.type = "password";
-  $("#toggle-key").innerHTML = icon("eye");
-  setKeyStatus(store.apiKey ? `Conectado ao ${CLAUDE_LABEL}.` : "", store.apiKey ? "ok" : "");
   renderEngine();
   els.settings.showModal();
   closeDrawer();
@@ -555,54 +545,6 @@ function openSettings() {
 
 $("#open-settings").addEventListener("click", openSettings);
 $("#engine-btn").addEventListener("click", openSettings);
-$("#plan-claude").addEventListener("click", () => els.apiKey.focus());
-$("#plan-free").addEventListener("click", () => {
-  if (!store.apiKey) return;
-  store.setApiKey("");
-  els.apiKey.value = "";
-  setKeyStatus("Usando o modelo gratuito.");
-  renderEngine();
-});
-
-$("#toggle-key").addEventListener("click", (e) => {
-  const show = els.apiKey.type === "password";
-  els.apiKey.type = show ? "text" : "password";
-  e.currentTarget.innerHTML = icon(show ? "eye-off" : "eye");
-});
-
-$("#settings-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const key = els.apiKey.value.trim();
-  if (!key) {
-    store.setApiKey("");
-    renderEngine();
-    els.settings.close();
-    return;
-  }
-  const btn = $("#save-key");
-  btn.disabled = true;
-  setKeyStatus("Verificando a chave…");
-  try {
-    const res = await fetch("/api/key", { method: "POST", headers: { "x-api-key": key } });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "Chave inválida.");
-    store.setApiKey(key);
-    renderEngine();
-    els.settings.close();
-    toast(`Conectado ao ${CLAUDE_LABEL}`);
-  } catch (err) {
-    setKeyStatus(err.message, "error");
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("#remove-key").addEventListener("click", () => {
-  store.setApiKey("");
-  els.apiKey.value = "";
-  setKeyStatus("Chave removida. Usando o modelo gratuito.");
-  renderEngine();
-});
 
 $("#clear-all").addEventListener("click", () => {
   if (!confirm("Apagar todas as conversas deste navegador?")) return;

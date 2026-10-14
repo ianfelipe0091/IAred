@@ -37,10 +37,10 @@
       <nav class="history" id="history"></nav>
 
       <button class="sb-settings" id="open-settings">
-        <span class="sb-settings-icon" data-icon="key"></span>
+        <span class="sb-settings-icon" data-icon="sparkle"></span>
         <span class="sb-text sb-settings-text">
           <span>Configurações</span>
-          <small><i class="dot" id="engine-dot"></i><span id="engine-sub">Modelo gratuito</span></small>
+          <small><i class="dot" id="engine-dot"></i><span id="engine-sub">KIRA Free</span></small>
         </span>
       </button>
     </aside>
@@ -70,7 +70,7 @@
         <form class="composer" id="composer">
           <textarea id="input" rows="1" placeholder="Pergunte qualquer coisa sobre segurança…" aria-label="Mensagem"></textarea>
           <div class="composer-bar">
-            <button type="button" class="model-chip" id="engine-btn" title="Modelo e chave da API">
+            <button type="button" class="model-chip" id="engine-btn" title="Modelo de IA">
               <span data-icon="sparkle"></span><span id="engine-label">KIRA Free</span><span data-icon="chevron"></span>
             </button>
             <button type="submit" class="send" id="send" aria-label="Enviar"></button>
@@ -92,34 +92,18 @@
 
       <div class="modal-body">
         <p class="field-label">Modelo de IA</p>
-        <div class="plans">
-          <div class="plan" id="plan-free">
-            <span class="plan-icon" data-icon="bolt"></span>
-            <span class="plan-text"><b>KIRA Free</b><small>Nemotron 3 120B · grátis, sem configurar</small></span>
-            <span class="plan-check" data-icon="check"></span>
-          </div>
-          <div class="plan" id="plan-claude">
-            <span class="plan-icon plan-icon-ai" data-icon="sparkle"></span>
-            <span class="plan-text"><b>Claude Opus 5.5</b><small>Mais inteligente · usa sua chave da Anthropic</small></span>
-            <span class="plan-check" data-icon="check"></span>
-          </div>
+        <div class="plan active">
+          <span class="plan-icon plan-icon-ai" data-icon="sparkle"></span>
+          <span class="plan-text"><b id="model-name">KIRA Free</b><small>Definido pelo administrador</small></span>
+          <span class="plan-check" data-icon="check"></span>
         </div>
-
-        <label class="field-label" for="api-key">Chave da API da Anthropic</label>
-        <div class="key-field">
-          <span data-icon="key"></span>
-          <input id="api-key" type="password" placeholder="Cole aqui: sk-ant-..." autocomplete="off" spellcheck="false" />
-          <button type="button" class="icon-btn" id="toggle-key" aria-label="Mostrar chave" data-icon="eye"></button>
-        </div>
-        <p class="key-status" id="key-status"></p>
-        <p class="hint">A chave fica salva só neste navegador e é usada apenas para gerar as respostas. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">Criar uma chave ↗</a></p>
+        <p class="hint">Todas as conversas usam o modelo de IA escolhido pelo administrador. O histórico fica salvo só neste navegador.</p>
       </div>
 
       <footer class="modal-foot">
         <button type="button" class="link-danger" id="clear-all">Apagar conversas</button>
         <span class="foot-spacer"></span>
-        <button type="button" class="btn ghost" id="remove-key">Remover chave</button>
-        <button type="submit" class="btn primary" id="save-key">Salvar</button>
+        <button type="submit" class="btn primary">Fechar</button>
       </footer>
     </form>
   </dialog>

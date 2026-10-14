@@ -6,5 +6,7 @@ pages_build_output_dir = "./dist"
 [ai]
 binding = "AI"
 
-# Opcional: ANTHROPIC_API_KEY (secret) define uma chave padrão do Claude para todos os visitantes.
-# Sem ela, cada usuário pode colar a própria chave em Configurações no app.
+# Painel administrativo (/admin): precisa do KV "CONFIG" e do secret ADMIN_PASSWORD.
+#   npx wrangler kv namespace create kira-config --binding CONFIG --update-config
+#   npx wrangler pages secret put ADMIN_PASSWORD --project-name kira
+# Opcional: ANTHROPIC_API_KEY (secret) é usada enquanto o painel não tiver uma IA configurada.

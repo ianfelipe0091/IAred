@@ -6,12 +6,13 @@ Assistente de IA no estilo Claude, especialista em segurança da informação, r
 
 ## Como funciona
 
-- **Sem chave:** usa o modelo gratuito (NVIDIA Nemotron 3 120B no Workers AI).
-- **Com chave da Anthropic:** em **Configurações → Chave da API**, cole sua chave (`sk-ant-...`). O app valida a chave e passa a usar o **Claude Opus 5.5** com raciocínio adaptativo.
+O administrador escolhe a IA que todos os usuários vão usar no **painel administrativo** (`/admin`): cola a **URL da API** e o **token**, e o KIRA reconhece o provedor sozinho.
 
-A chave fica salva apenas no navegador (localStorage) e é enviada à função `/api/chat` somente para gerar as respostas; ela não é registrada nem armazenada no servidor.
+- **Anthropic (Claude):** `https://api.anthropic.com`. O app usa raciocínio adaptativo, esforço e fallback automático quando o modelo escolhido aceita.
+- **Compatíveis com a OpenAI:** OpenAI, OpenRouter, Groq, Google Gemini, DeepSeek, Mistral, xAI, Perplexity, Together, Fireworks, Cerebras, Maritaca e qualquer outra API no formato Chat Completions.
+- **Sem configuração:** usa o modelo gratuito (NVIDIA Nemotron 3 120B no Workers AI).
 
-Também é possível definir uma chave padrão para todos os visitantes com o secret `ANTHROPIC_API_KEY` do projeto (a chave colada no navegador tem prioridade).
+Os usuários não colam chave nenhuma: o token fica só no servidor (KV da Cloudflare) e nunca é enviado ao navegador.
 
 ## Recursos
 
@@ -29,14 +30,17 @@ Também é possível definir uma chave padrão para todos os visitantes com o se
 ```
 functions/
   api/chat.js         POST /api/chat  → streaming SSE (Claude ou modelo gratuito)
-  api/key.js          GET/POST /api/key → modelo ativo / valida a chave colada
+  api/model.js        GET  /api/model → modelo ativo (para o app)
   api/title.js        POST /api/title → título automático
+  api/admin/*         login, reconhecimento do provedor e configuração da IA
   _lib/prompt.js      prompt de sistema do especialista
-  _lib/providers.js   integração com Anthropic e Workers AI
-src/                  frontend (JS puro, empacotado com esbuild)
+  _lib/providers.js   integração com Anthropic, APIs compatíveis com OpenAI e Workers AI
+  _lib/detect.js      reconhece o provedor pela URL/token e testa a conexão
+  _lib/admin-auth.js  senha do admin, sessão assinada e limite de tentativas
+src/                  frontend (JS puro, empacotado com esbuild); admin.* é o painel
 public/               estáticos (ícones, manifest, _headers)
 build.mjs             gera dist/
-wrangler.toml         configuração do Pages (binding AI)
+wrangler.toml         configuração do Pages (bindings AI e CONFIG)
 ```
 
 ## Desenvolvimento e deploy
@@ -50,11 +54,33 @@ export CLOUDFLARE_ACCOUNT_ID=...
 npm run deploy                       # build + wrangler pages deploy --branch main
 ```
 
-Chave padrão opcional para todos os visitantes:
+## Painel administrativo
+
+Configuração única (com o Wrangler logado na conta da Cloudflare):
 
 ```bash
-npx wrangler pages secret put ANTHROPIC_API_KEY --project-name kira
+# 1. Armazenamento da configuração (já grava o binding CONFIG no wrangler.toml)
+npx wrangler kv namespace create kira-config --binding CONFIG --update-config
+
+# 2. Senha do admin (mínimo de 12 caracteres)
+npx wrangler pages secret put ADMIN_PASSWORD --project-name kira
+
+# 3. Publicar
+npm run deploy
 ```
+
+Depois, abra `https://kira-cb0.pages.dev/admin`, entre com a senha e preencha:
+
+1. **URL da API** (ex.: `https://api.openai.com/v1`). Em branco, o KIRA tenta reconhecer pelo token.
+2. **Token da IA**.
+3. **Reconhecer provedor** para listar os modelos, escolher o **modelo** e, se quiser, o nome que os usuários veem.
+4. **Testar e salvar**: o painel faz uma pergunta curta à IA e só salva se ela responder.
+
+A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagação do KV). Para voltar ao modelo gratuito, use **Remover configuração**.
+
+Segurança do painel: sessão em cookie `HttpOnly`/`SameSite=Strict` assinado com HMAC (8 h), bloqueio por 15 min após 10 senhas erradas, as rotas de escrita só aceitam requisições do próprio site e o token nunca é devolvido ao navegador (o painel mostra só os 4 últimos caracteres). Trocar a `ADMIN_PASSWORD` encerra todas as sessões abertas.
+
+Enquanto o painel não tiver uma IA configurada, o secret opcional `ANTHROPIC_API_KEY` continua valendo como chave padrão do Claude.
 
 ## Uso responsável
 
