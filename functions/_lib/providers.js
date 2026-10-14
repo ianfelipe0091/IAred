@@ -1,28 +1,47 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-// Todos os provedores emitem os mesmos eventos para o frontend:
+// Os dois provedores emitem os mesmos eventos para o frontend:
 //   { type: "thinking", text }   trecho do raciocínio
 //   { type: "text", text }       trecho da resposta
-//   { type: "notice", text }     aviso curto (ex.: fallback de modelo)
+//   { type: "notice", text }     aviso curto
 //   { type: "usage", input, output }
 
-const EFFORTS = new Set(["low", "medium", "high"]);
+export const CLAUDE = {
+  id: "claude",
+  label: "Claude Opus 5.5",
+  model: "claude-opus-5-5",
+  maxTokens: 64000,
+  contextTokens: 900000,
+};
 
-// ---------- Workers AI ----------
+export const FREE = {
+  id: "free",
+  label: "IAHack Free",
+  model: "@cf/nvidia/nemotron-3-120b-a12b",
+  maxTokens: 16000,
+  contextTokens: 200000,
+};
 
-export async function* streamWorkersAI(env, spec, { system, messages, effort, signal }) {
-  const input = {
-    messages: [{ role: "system", content: system }, ...messages],
-    stream: true,
-    max_tokens: spec.maxTokens,
-  };
-  if (spec.effort && EFFORTS.has(effort)) input.reasoning_effort = effort;
+export function isAnthropicKey(key) {
+  return typeof key === "string" && /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key.trim());
+}
 
-  const stream = await env.AI.run(spec.model, input, { signal });
+// ---------- Workers AI (modelo gratuito) ----------
+
+export async function* streamWorkersAI(env, { system, messages, signal }) {
+  const stream = await env.AI.run(
+    FREE.model,
+    {
+      messages: [{ role: "system", content: system }, ...messages],
+      stream: true,
+      max_tokens: FREE.maxTokens,
+    },
+    { signal },
+  );
   yield* parseWorkersAIStream(stream);
 }
 
-export async function* parseWorkersAIStream(stream) {
+async function* parseWorkersAIStream(stream) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -56,7 +75,6 @@ export async function* parseWorkersAIStream(stream) {
           if (reasoning) yield { type: "thinking", text: reasoning };
           if (delta.content) yield { type: "text", text: delta.content };
         } else if (typeof chunk.response === "string" && chunk.response) {
-          // Formato legado do Workers AI: { response: "..." }
           yield { type: "text", text: chunk.response };
         }
       }
@@ -72,43 +90,37 @@ export async function* parseWorkersAIStream(stream) {
 
 export function describeWorkersAIError(err) {
   const msg = String(err?.message || err);
-  if (msg.includes("5035") || /not available on the Workers Free plan/i.test(msg)) {
-    return "Este modelo exige o plano Workers Paid da Cloudflare. Escolha outro modelo.";
-  }
   if (/daily free allocation|neurons|4006/i.test(msg)) {
-    return "A cota diária gratuita do Workers AI acabou. Tente novamente amanhã ou faça upgrade do plano.";
+    return "A cota gratuita de hoje acabou. Conecte sua chave da API nas configurações para continuar.";
   }
   if (/context|too long|max.*tokens/i.test(msg)) {
-    return "A conversa ficou longa demais para este modelo. Inicie uma nova conversa ou escolha um modelo com mais contexto.";
+    return "A conversa ficou longa demais. Inicie uma nova conversa.";
   }
-  return `Falha no Workers AI: ${msg.slice(0, 300)}`;
+  return `Falha no modelo gratuito: ${msg.slice(0, 300)}`;
 }
 
 // ---------- Anthropic (Claude) ----------
 
-export async function* streamAnthropic(env, spec, { system, messages, effort, signal }) {
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+export async function* streamAnthropic(apiKey, { system, messages, signal }) {
+  const client = new Anthropic({ apiKey });
 
-  const params = {
-    model: spec.model,
-    max_tokens: spec.maxTokens,
-    system,
-    messages: toAnthropicMessages(messages),
-    thinking: { type: "adaptive", display: "summarized" },
-    output_config: { effort: EFFORTS.has(effort) ? effort : "medium" },
-  };
-  if (spec.fallbacks) {
-    params.betas = ["server-side-fallback-2026-07-01"];
-    params.fallbacks = "default";
-  }
-
-  const stream = client.beta.messages.stream(params, { signal });
+  const stream = client.beta.messages.stream(
+    {
+      model: CLAUDE.model,
+      max_tokens: CLAUDE.maxTokens,
+      system,
+      messages: toAnthropicMessages(messages),
+      thinking: { type: "adaptive", display: "summarized" },
+      output_config: { effort: "high" },
+      cache_control: { type: "ephemeral" },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+    },
+    { signal },
+  );
 
   for await (const event of stream) {
-    if (event.type === "content_block_start" && event.content_block.type === "fallback") {
-      const to = event.content_block.to?.model || "outro modelo";
-      yield { type: "notice", text: `Resposta continuada por ${to}.` };
-    } else if (event.type === "content_block_delta") {
+    if (event.type === "content_block_delta") {
       if (event.delta.type === "thinking_delta" && event.delta.thinking) {
         yield { type: "thinking", text: event.delta.thinking };
       } else if (event.delta.type === "text_delta" && event.delta.text) {
@@ -121,14 +133,17 @@ export async function* streamAnthropic(env, spec, { system, messages, effort, si
   if (final.stop_reason === "refusal") {
     yield {
       type: "notice",
-      text: "O modelo recusou esta solicitação por política de segurança. Reformule com mais contexto (escopo, autorização, objetivo defensivo).",
+      text: "O modelo recusou esta solicitação. Reformule com mais contexto (objetivo defensivo, escopo e autorização).",
     };
   } else if (final.stop_reason === "max_tokens") {
     yield { type: "notice", text: "A resposta atingiu o limite de tamanho. Peça para continuar." };
   }
   yield {
     type: "usage",
-    input: (final.usage.input_tokens || 0) + (final.usage.cache_read_input_tokens || 0),
+    input:
+      (final.usage.input_tokens || 0) +
+      (final.usage.cache_read_input_tokens || 0) +
+      (final.usage.cache_creation_input_tokens || 0),
     output: final.usage.output_tokens || 0,
   };
 }
@@ -148,18 +163,32 @@ function toAnthropicMessages(messages) {
   return out;
 }
 
+export async function verifyAnthropicKey(apiKey) {
+  const client = new Anthropic({ apiKey, maxRetries: 0 });
+  await client.models.retrieve(CLAUDE.model);
+}
+
 export function describeAnthropicError(err) {
   if (err instanceof Anthropic.AuthenticationError) {
-    return "Chave da Anthropic inválida. Verifique o secret ANTHROPIC_API_KEY.";
+    return "Chave da API inválida. Confira a chave nas configurações.";
+  }
+  if (err instanceof Anthropic.PermissionDeniedError) {
+    return "Esta chave não tem permissão para usar o Claude Opus 5.5.";
+  }
+  if (err instanceof Anthropic.NotFoundError) {
+    return "Modelo não disponível para esta chave.";
   }
   if (err instanceof Anthropic.RateLimitError) {
-    return "Limite de requisições da Anthropic atingido. Aguarde alguns segundos e tente de novo.";
+    return "Limite de uso da sua chave atingido. Aguarde alguns segundos e tente de novo.";
   }
   if (err instanceof Anthropic.BadRequestError) {
-    return `Requisição recusada pela Anthropic: ${err.message}`;
+    if (/credit balance/i.test(err.message)) {
+      return "Sua conta da Anthropic está sem créditos. Adicione créditos no console da Anthropic.";
+    }
+    return `Requisição recusada: ${err.message}`;
   }
   if (err instanceof Anthropic.APIError) {
-    return `Erro da Anthropic (${err.status ?? "rede"}): ${err.message}`;
+    return `Erro da API (${err.status ?? "rede"}): ${err.message}`;
   }
   return `Falha ao falar com o Claude: ${String(err?.message || err)}`;
 }

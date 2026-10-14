@@ -1,18 +1,20 @@
-import { checkAccess, json } from "../_lib/http.js";
+const json = (data, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
 
 const TITLE_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 // Gera um título curto para a conversa a partir da primeira mensagem.
 export async function onRequestPost({ request, env }) {
-  const denied = checkAccess(request, env);
-  if (denied) return denied;
   if (!env.AI) return json({ title: null });
 
   let text = "";
   try {
     text = String((await request.json()).text || "").slice(0, 2000);
   } catch {
-    return json({ title: null }, { status: 400 });
+    return json({ title: null }, 400);
   }
   if (!text.trim()) return json({ title: null });
 

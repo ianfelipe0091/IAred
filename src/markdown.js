@@ -63,12 +63,10 @@ const marked = new Marked({
       } catch {
         highlighted = escapeHtml(text);
       }
-      const lines = text.split("\n").length;
       return `<div class="code-block" data-lang="${escapeHtml(language || "texto")}">
   <div class="code-head">
     <span class="code-lang">${escapeHtml(language || "texto")}</span>
     <span class="code-actions">
-      ${lines > 6 ? `<button class="code-btn" data-action="panel" title="Abrir no painel">${icon("expand")}<span>Painel</span></button>` : ""}
       <button class="code-btn" data-action="copy" title="Copiar">${icon("copy")}<span>Copiar</span></button>
     </span>
   </div>

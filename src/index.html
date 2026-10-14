@@ -1,175 +1,101 @@
 <!doctype html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>IAHack — IA para Cibersegurança</title>
-  <meta name="description" content="IAHack: assistente de IA para cibersegurança. Blue team, AppSec, resposta a incidentes, pentest autorizado, cloud e compliance." />
-  <meta name="theme-color" content="#06100b" />
+  <meta name="description" content="IAHack: assistente de IA especialista em cibersegurança." />
+  <meta name="theme-color" content="#f7f8f4" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#232523" media="(prefers-color-scheme: dark)" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/app.css" />
-  <script src="/assets/theme.js"></script>
 </head>
 <body>
-  <div class="bg-grid" aria-hidden="true"></div>
-  <div class="app" id="app">
+  <div class="app is-empty" id="app">
     <aside class="sidebar" id="sidebar" aria-label="Conversas">
       <div class="sidebar-head">
         <a class="brand" href="/" id="brand-link" aria-label="IAHack — início">
           <span class="brand-mark" data-icon="logo"></span>
-          <span class="brand-name">IA<span>Hack</span></span>
+          <span class="brand-name">IAHack</span>
         </a>
         <button class="icon-btn only-mobile" id="close-sidebar" aria-label="Fechar menu" data-icon="close"></button>
       </div>
-      <button class="new-chat" id="new-chat">
-        <span data-icon="plus"></span>
-        <span>Nova conversa</span>
-        <kbd>Ctrl K</kbd>
-      </button>
-      <label class="search">
-        <span data-icon="search"></span>
-        <input id="search" type="search" placeholder="Buscar conversas" autocomplete="off" />
-      </label>
+      <button class="new-chat" id="new-chat"><span class="new-chat-icon" data-icon="plus"></span>Nova conversa</button>
+      <div class="h-label">Recentes</div>
       <nav class="history" id="history"></nav>
-      <div class="sidebar-foot">
-        <button class="side-link" id="open-tools"><span data-icon="toolbox"></span>Kit de ferramentas</button>
-        <button class="side-link" id="open-settings"><span data-icon="settings"></span>Configurações</button>
-        <div class="status-line" id="status-line"><span class="pulse"></span><span id="status-text">Conectando…</span></div>
-      </div>
+      <button class="settings-btn" id="open-settings">
+        <span class="settings-icon" data-icon="settings"></span>
+        <span class="settings-text">
+          <span>Configurações</span>
+          <small id="engine-sub">Modelo gratuito</small>
+        </span>
+      </button>
     </aside>
     <div class="scrim" id="scrim"></div>
 
-    <main class="main" id="main">
+    <main class="main">
       <header class="topbar">
         <button class="icon-btn only-mobile" id="open-sidebar" aria-label="Abrir menu" data-icon="menu"></button>
-        <div class="title-wrap">
-          <button class="chat-title" id="chat-title" title="Renomear conversa">Nova conversa</button>
-        </div>
-        <div class="top-actions">
-          <button class="icon-btn" id="export-chat" title="Exportar conversa (Markdown)" aria-label="Exportar conversa" data-icon="download"></button>
-          <button class="icon-btn" id="toggle-theme" title="Alternar tema" aria-label="Alternar tema" data-icon="theme"></button>
-        </div>
+        <button class="chat-title" id="chat-title" title="Renomear conversa"></button>
+        <span class="topbar-spacer"></span>
       </header>
 
-      <section class="thread" id="thread" aria-live="polite">
+      <section class="thread" id="thread">
         <div class="welcome" id="welcome">
-          <div class="hero-mark"><span data-icon="logo"></span><div class="radar"></div></div>
-          <h1 id="greeting">Boa noite, defensor.</h1>
-          <p class="subtitle">Sua IA de cibersegurança. Análise de logs, código seguro, resposta a incidentes, hardening e muito mais.</p>
+          <span class="welcome-mark" data-icon="logo"></span>
+          <h1 id="greeting">Boa noite</h1>
         </div>
-        <div class="messages" id="messages"></div>
+        <div class="messages" id="messages" aria-live="polite"></div>
       </section>
 
-      <div class="composer-dock" id="composer-dock">
-        <div class="suggestions" id="suggestions"></div>
+      <div class="dock">
         <form class="composer" id="composer">
-          <div class="attachments" id="attachments"></div>
-          <textarea id="input" rows="1" placeholder="Pergunte sobre segurança, cole logs ou código…" aria-label="Mensagem"></textarea>
+          <textarea id="input" rows="1" placeholder="Como posso ajudar na sua segurança hoje?" aria-label="Mensagem"></textarea>
           <div class="composer-bar">
-            <div class="composer-left">
-              <button type="button" class="icon-btn" id="attach" title="Anexar arquivo de texto (logs, código, configs)" aria-label="Anexar arquivo" data-icon="paperclip"></button>
-              <input type="file" id="file-input" multiple hidden />
-              <div class="dropdown" id="agent-dropdown">
-                <button type="button" class="pill" id="agent-btn" aria-haspopup="listbox">
-                  <span data-icon="shield"></span><span id="agent-label">IAHack</span><span data-icon="chevron"></span>
-                </button>
-                <div class="menu" id="agent-menu" role="listbox"></div>
-              </div>
-              <div class="dropdown" id="effort-dropdown">
-                <button type="button" class="pill" id="effort-btn" title="Profundidade de raciocínio">
-                  <span data-icon="brain"></span><span id="effort-label">Equilibrado</span>
-                </button>
-                <div class="menu" id="effort-menu" role="listbox"></div>
-              </div>
-            </div>
-            <div class="composer-right">
-              <div class="dropdown" id="model-dropdown">
-                <button type="button" class="model-btn" id="model-btn" aria-haspopup="listbox">
-                  <span id="model-label">Carregando…</span><span data-icon="chevron"></span>
-                </button>
-                <div class="menu menu-right menu-up" id="model-menu" role="listbox"></div>
-              </div>
-              <button type="submit" class="send" id="send" aria-label="Enviar" data-icon="arrow-up"></button>
-            </div>
+            <button type="button" class="engine-btn" id="engine-btn" title="Trocar modelo / colar chave da API">
+              <span id="engine-label">IAHack Free</span><span data-icon="chevron"></span>
+            </button>
+            <button type="submit" class="send" id="send" aria-label="Enviar" data-icon="arrow-up"></button>
           </div>
         </form>
         <p class="disclaimer">O IAHack pode cometer erros. Use apenas em sistemas que você tem autorização para testar.</p>
       </div>
     </main>
-
-    <aside class="panel" id="panel" aria-label="Painel">
-      <header class="panel-head">
-        <div class="panel-title"><span data-icon="code"></span><span id="panel-title">Código</span></div>
-        <div class="panel-actions">
-          <button class="icon-btn" id="panel-copy" title="Copiar" aria-label="Copiar" data-icon="copy"></button>
-          <button class="icon-btn" id="panel-download" title="Baixar" aria-label="Baixar" data-icon="download"></button>
-          <button class="icon-btn" id="panel-close" title="Fechar" aria-label="Fechar painel" data-icon="close"></button>
-        </div>
-      </header>
-      <div class="panel-body" id="panel-body"></div>
-    </aside>
   </div>
 
-  <dialog class="modal" id="tools-modal">
-    <div class="modal-card wide">
+  <dialog class="modal" id="settings">
+    <form class="modal-card" method="dialog" id="settings-form">
       <header class="modal-head">
-        <div>
-          <h2>Kit de ferramentas</h2>
-          <p>Utilitários que rodam 100% no seu navegador. Nada é enviado ao servidor.</p>
-        </div>
-        <button class="icon-btn" data-close aria-label="Fechar" data-icon="close"></button>
+        <h2>Configurações</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Fechar" data-icon="close"></button>
       </header>
-      <div class="tools">
-        <nav class="tool-tabs" id="tool-tabs"></nav>
-        <div class="tool-body" id="tool-body"></div>
-      </div>
-    </div>
-  </dialog>
 
-  <dialog class="modal" id="settings-modal">
-    <div class="modal-card">
-      <header class="modal-head">
-        <div>
-          <h2>Configurações</h2>
-          <p>Preferências ficam salvas apenas neste navegador.</p>
+      <section class="modal-section">
+        <h3>Chave da API</h3>
+        <p class="hint">Cole sua chave da Anthropic para usar o <b>Claude Opus 5.5</b>. Sem chave, o IAHack usa o modelo gratuito.</p>
+        <div class="key-field">
+          <input id="api-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+          <button type="button" class="icon-btn" id="toggle-key" aria-label="Mostrar chave" data-icon="eye"></button>
         </div>
-        <button class="icon-btn" data-close aria-label="Fechar" data-icon="close"></button>
-      </header>
-      <div class="settings">
-        <label class="field">
-          <span>Tema</span>
-          <select id="set-theme">
-            <option value="dark">Escuro</option>
-            <option value="light">Claro</option>
-            <option value="system">Seguir o sistema</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Como devo te chamar?</span>
-          <input id="set-name" type="text" maxlength="40" placeholder="Ex.: Ana" />
-        </label>
-        <label class="field">
-          <span>Instruções personalizadas</span>
-          <textarea id="set-instructions" rows="5" maxlength="4000" placeholder="Ex.: Trabalho em um SOC com Microsoft Sentinel. Prefiro respostas objetivas, com consultas KQL."></textarea>
-        </label>
-        <label class="field" id="access-field">
-          <span>Código de acesso</span>
-          <input id="set-access" type="password" autocomplete="off" placeholder="Fornecido pelo administrador" />
-        </label>
-        <div class="settings-row">
-          <button class="btn ghost" id="export-all"><span data-icon="download"></span>Exportar tudo (JSON)</button>
-          <button class="btn danger" id="clear-all"><span data-icon="trash"></span>Apagar todas as conversas</button>
-        </div>
-      </div>
+        <p class="key-status" id="key-status"></p>
+        <p class="hint small">A chave fica salva só neste navegador e é usada apenas para responder às suas mensagens. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">Criar uma chave</a></p>
+      </section>
+
+      <section class="modal-section">
+        <h3>Dados</h3>
+        <button type="button" class="link-danger" id="clear-all">Apagar todas as conversas</button>
+      </section>
+
       <footer class="modal-foot">
-        <button class="btn primary" id="save-settings">Salvar</button>
+        <button type="button" class="btn ghost" id="remove-key">Remover chave</button>
+        <button type="submit" class="btn primary" id="save-key">Salvar</button>
       </footer>
-    </div>
+    </form>
   </dialog>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>

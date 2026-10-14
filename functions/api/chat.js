@@ -1,50 +1,56 @@
-import { availableModels, defaultModelId } from "../_lib/catalog.js";
-import { buildSystemPrompt } from "../_lib/prompts.js";
-import { checkAccess, json } from "../_lib/http.js";
+import { buildSystemPrompt } from "../_lib/prompt.js";
 import {
+  CLAUDE,
+  FREE,
   describeAnthropicError,
   describeWorkersAIError,
+  isAnthropicKey,
   streamAnthropic,
   streamWorkersAI,
 } from "../_lib/providers.js";
 
 const MAX_MESSAGES = 200;
-const MAX_TOTAL_CHARS = 1_500_000;
+const MAX_TOTAL_CHARS = 2_000_000;
 const CHARS_PER_TOKEN = 3.2;
 
-export async function onRequestPost({ request, env }) {
-  const denied = checkAccess(request, env);
-  if (denied) return denied;
+const json = (data, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
 
+export async function onRequestPost({ request, env }) {
   let body;
   try {
     body = await request.json();
   } catch {
-    return json({ error: "JSON inválido." }, { status: 400 });
+    return json({ error: "JSON inválido." }, 400);
   }
 
-  const models = availableModels(env);
-  const spec = models.find((m) => m.id === body.model) || models.find((m) => m.id === defaultModelId(env));
-  if (!spec) {
-    return json({ error: "Nenhum modelo disponível. Verifique o binding AI do projeto." }, { status: 503 });
+  // Chave enviada pelo navegador (colada nas configurações) ou secret do projeto.
+  const userKey = (request.headers.get("x-api-key") || "").trim();
+  if (userKey && !isAnthropicKey(userKey)) {
+    return json({ error: "Chave da API em formato inválido. Ela deve começar com sk-ant-." }, 400);
+  }
+  const apiKey = userKey || env.ANTHROPIC_API_KEY || "";
+  const engine = apiKey ? CLAUDE : FREE;
+  if (!apiKey && !env.AI) {
+    return json({ error: "Nenhum modelo disponível. Conecte uma chave da API nas configurações." }, 503);
   }
 
   const messages = sanitizeMessages(body.messages);
   if (!messages.length || messages[messages.length - 1].role !== "user") {
-    return json({ error: "A conversa precisa terminar com uma mensagem do usuário." }, { status: 400 });
+    return json({ error: "A conversa precisa terminar com uma mensagem do usuário." }, 400);
   }
   const totalChars = messages.reduce((n, m) => n + m.content.length, 0);
   if (messages.length > MAX_MESSAGES || totalChars > MAX_TOTAL_CHARS) {
-    return json({ error: "Conversa grande demais. Inicie uma nova conversa." }, { status: 413 });
+    return json({ error: "Conversa grande demais. Inicie uma nova conversa." }, 413);
   }
 
-  const system = buildSystemPrompt({ agent: body.agent, customInstructions: body.customInstructions });
-  const { kept, dropped } = fitToContext(messages, spec, system);
+  const system = buildSystemPrompt();
+  const { kept, dropped } = fitToContext(messages, engine, system);
   if (!kept.length) {
-    return json(
-      { error: "Sua mensagem é grande demais para este modelo. Reduza o anexo ou escolha um modelo com mais contexto." },
-      { status: 413 },
-    );
+    return json({ error: "Sua mensagem é grande demais. Reduza o texto e tente de novo." }, 413);
   }
 
   const { readable, writable } = new TransformStream();
@@ -52,24 +58,21 @@ export async function onRequestPost({ request, env }) {
   const encoder = new TextEncoder();
   const send = (event) => writer.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
 
-  const run = async () => {
+  (async () => {
     const started = Date.now();
     try {
-      await send({ type: "meta", model: spec.id, label: spec.label });
+      await send({ type: "meta", model: engine.id, label: engine.label });
       if (dropped > 0) {
-        await send({
-          type: "notice",
-          text: `${dropped} mensagem(ns) antiga(s) foram omitidas para caber no contexto do ${spec.label}.`,
-        });
+        await send({ type: "notice", text: `${dropped} mensagem(ns) antiga(s) foram omitidas para caber no contexto.` });
       }
-      const args = { system, messages: kept, effort: body.effort, signal: request.signal };
-      const events = spec.provider === "anthropic" ? streamAnthropic(env, spec, args) : streamWorkersAI(env, spec, args);
+      const args = { system, messages: kept, signal: request.signal };
+      const events = apiKey ? streamAnthropic(apiKey, args) : streamWorkersAI(env, args);
       for await (const event of events) {
         await send(event);
       }
       await send({ type: "done", ms: Date.now() - started });
     } catch (err) {
-      const message = spec.provider === "anthropic" ? describeAnthropicError(err) : describeWorkersAIError(err);
+      const message = apiKey ? describeAnthropicError(err) : describeWorkersAIError(err);
       try {
         await send({ type: "error", message });
       } catch {
@@ -82,8 +85,7 @@ export async function onRequestPost({ request, env }) {
         // stream já encerrado
       }
     }
-  };
-  run();
+  })();
 
   return new Response(readable, {
     headers: {
@@ -107,8 +109,8 @@ function sanitizeMessages(input) {
 }
 
 // Mantém as mensagens mais recentes que cabem na janela de contexto do modelo.
-function fitToContext(messages, spec, system) {
-  const budget = (spec.contextTokens - spec.maxTokens - 1024) * CHARS_PER_TOKEN - system.length;
+function fitToContext(messages, engine, system) {
+  const budget = (engine.contextTokens - engine.maxTokens - 1024) * CHARS_PER_TOKEN - system.length;
   const kept = [];
   let used = 0;
   for (let i = messages.length - 1; i >= 0; i--) {
