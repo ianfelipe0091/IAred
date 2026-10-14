@@ -1,7 +1,7 @@
 /* =========================================================
    KIRA — design system
    Escuro por padrão, claro automático. A cor só aparece na
-   "assinatura de IA": o gradiente aurora (verde → turquesa → ciano).
+   "assinatura de IA": o gradiente brasa (laranja → coral → carmim).
    ========================================================= */
 
 @property --angle {
@@ -19,62 +19,62 @@
   --sb-rail: 64px;
   --ease: cubic-bezier(.22, 1, .36, 1);
 
-  --a1: #4ade80;
-  --a2: #2dd4bf;
-  --a3: #22d3ee;
-  --a4: #a3e635;
+  --a1: #ff7a45;
+  --a2: #fb4b6b;
+  --a3: #e11d48;
+  --a4: #ff9f6b;
   --aurora: linear-gradient(100deg, var(--a1) 0%, var(--a2) 40%, var(--a3) 70%, var(--a4) 100%);
   --aurora-ring: conic-gradient(from var(--angle), var(--a1), var(--a2), var(--a3), var(--a4), var(--a1));
 
-  --bg: #0c0e0d;
-  --bg-side: #101312;
-  --surface: #161a18;
-  --surface-2: #1d2220;
-  --surface-3: #262c29;
+  --bg: #0e0c0c;
+  --bg-side: #131010;
+  --surface: #1a1616;
+  --surface-2: #221d1d;
+  --surface-3: #2c2525;
   --border: rgba(255, 255, 255, .07);
   --border-strong: rgba(255, 255, 255, .13);
-  --text: #edf1ee;
-  --text-2: #b3bcb6;
-  --muted: #7b847f;
-  --accent: #34d399;
-  --btn: #edf1ee;
-  --btn-ink: #0c0e0d;
+  --text: #f4eeee;
+  --text-2: #c2b6b6;
+  --muted: #8a7e7e;
+  --accent: #fb7185;
+  --btn: #f4eeee;
+  --btn-ink: #0e0c0c;
   --danger: #f87171;
-  --glow: rgba(45, 212, 191, .35);
+  --glow: rgba(244, 63, 94, .38);
   --shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 12px 40px -12px rgba(0, 0, 0, .6);
-  --halo: radial-gradient(70% 45% at 50% -8%, rgba(45, 212, 191, .10), transparent 70%);
-  --orb-base: radial-gradient(circle at 50% 60%, #0f3a2b, #04110c 75%);
+  --halo: radial-gradient(70% 45% at 50% -8%, rgba(244, 63, 94, .12), transparent 70%);
+  --orb-base: radial-gradient(circle at 50% 60%, #4a1018, #160407 75%);
 
-  --code-bg: #0a0c0b;
-  --code-head: #121514;
-  --code-text: #dfe6e1;
+  --code-bg: #0c0a0a;
+  --code-head: #161212;
+  --code-text: #ebe2e2;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --a1: #16a34a;
-    --a2: #0d9488;
-    --a3: #0891b2;
-    --a4: #65a30d;
+    --a1: #f05a28;
+    --a2: #e11d48;
+    --a3: #be123c;
+    --a4: #f97316;
     --bg: #ffffff;
-    --bg-side: #f6f7f6;
+    --bg-side: #faf7f7;
     --surface: #ffffff;
-    --surface-2: #f1f3f2;
-    --surface-3: #e7eae8;
+    --surface-2: #f5f0f0;
+    --surface-3: #ece5e5;
     --border: rgba(0, 0, 0, .07);
     --border-strong: rgba(0, 0, 0, .13);
-    --text: #111412;
-    --text-2: #49514c;
-    --muted: #7a827d;
-    --accent: #059669;
-    --btn: #111412;
+    --text: #181212;
+    --text-2: #574a4a;
+    --muted: #8a7b7b;
+    --accent: #e11d48;
+    --btn: #181212;
     --btn-ink: #ffffff;
     --danger: #dc2626;
-    --glow: rgba(13, 148, 136, .25);
+    --glow: rgba(225, 29, 72, .25);
     --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 10px 32px -12px rgba(0, 0, 0, .14);
-    --halo: radial-gradient(70% 45% at 50% -8%, rgba(13, 148, 136, .07), transparent 70%);
-    --orb-base: radial-gradient(circle at 50% 60%, #d3f8e6, #7fdcbd 80%);
+    --halo: radial-gradient(70% 45% at 50% -8%, rgba(225, 29, 72, .07), transparent 70%);
+    --orb-base: radial-gradient(circle at 50% 60%, #ffe0e0, #ff9a9a 80%);
   }
 }
 
@@ -99,12 +99,7 @@ svg { width: 18px; height: 18px; flex: none; display: block; }
 * { scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
 
 /* ---------- Marca ---------- */
-.logo {
-  display: inline-block; width: 26px; height: 26px; flex: none;
-  background: var(--aurora);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2.8 5 7v8c0 7 4.7 12 11 13.9C22.3 27 27 22 27 15V7L16 2.8Z' fill='none' stroke='%23000' stroke-width='2.6' stroke-linejoin='round'/%3E%3Cpath d='M16 9.2c.55 3.6 3.1 6.15 6.7 6.7-3.6.55-6.15 3.1-6.7 6.7-.55-3.6-3.1-6.15-6.7-6.7 3.6-.55 6.15-3.1 6.7-6.7Z' fill='%23000'/%3E%3C/svg%3E") center / contain no-repeat;
-          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2.8 5 7v8c0 7 4.7 12 11 13.9C22.3 27 27 22 27 15V7L16 2.8Z' fill='none' stroke='%23000' stroke-width='2.6' stroke-linejoin='round'/%3E%3Cpath d='M16 9.2c.55 3.6 3.1 6.15 6.7 6.7-3.6.55-6.15 3.1-6.7 6.7-.55-3.6-3.1-6.15-6.7-6.7 3.6-.55 6.15-3.1 6.7-6.7Z' fill='%23000'/%3E%3C/svg%3E") center / contain no-repeat;
-}
+.logo { display: block; width: 28px; height: 28px; flex: none; border-radius: 8px; box-shadow: 0 4px 14px -4px var(--glow); }
 .grad-text { background: var(--aurora); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* ---------- Orb: a "presença" da IA ---------- */
@@ -284,22 +279,22 @@ svg { width: 18px; height: 18px; flex: none; display: block; }
 /* Blocos de código: sempre escuros, como nos apps de IA */
 .code-block { margin: 2px 0 16px; border-radius: 14px; overflow: hidden; background: var(--code-bg); border: 1px solid var(--border-strong); color: var(--code-text); }
 .code-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px 7px 16px; background: var(--code-head); font-family: var(--font); }
-.code-lang { font-size: 12px; color: #8a948e; }
-.code-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 7px; font-size: 12px; color: #8a948e; }
-.code-btn:hover { background: rgba(255, 255, 255, .07); color: #e8eeea; }
-.code-btn.done { color: #4ade80; }
+.code-lang { font-size: 12px; color: #988b8b; }
+.code-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 7px; font-size: 12px; color: #988b8b; }
+.code-btn:hover { background: rgba(255, 255, 255, .07); color: #f1e8e8; }
+.code-btn.done { color: #fb7185; }
 .code-btn svg { width: 14px; height: 14px; }
 .code-block pre { margin: 0; padding: 16px; overflow-x: auto; font: 13px/1.65 var(--mono); }
 .code-block pre code { font: inherit; }
 
 .hljs { color: var(--code-text); }
-.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section { color: #6ee7b7; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section { color: #ff8fa3; }
 .hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute { color: #fcd38d; }
 .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-link { color: #fdba74; }
 .hljs-title, .hljs-title.function_, .hljs-built_in { color: #7dd3fc; }
-.hljs-comment, .hljs-quote, .hljs-meta { color: #6b756f; font-style: italic; }
+.hljs-comment, .hljs-quote, .hljs-meta { color: #7a6d6d; font-style: italic; }
 .hljs-type, .hljs-title.class_ { color: #c4b5fd; }
-.hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-params, .hljs-name, .hljs-tag { color: #f9a8b4; }
+.hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-params, .hljs-name, .hljs-tag { color: #fdba8c; }
 .hljs-deletion { color: #fca5a5; }
 
 /* =========================================================
@@ -394,7 +389,7 @@ svg { width: 18px; height: 18px; flex: none; display: block; }
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 .plan-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); color: var(--text-2); }
-.plan-icon-ai { background: var(--aurora); color: #04110c; }
+.plan-icon-ai { background: var(--aurora); color: #fff; }
 .plan-text { flex: 1; display: flex; flex-direction: column; min-width: 0; font-size: 14px; }
 .plan-text small { font-size: 12.5px; color: var(--muted); }
 .plan-check { width: 22px; height: 22px; border-radius: 50%; color: transparent; border: 1px solid var(--border-strong); }

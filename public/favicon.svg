@@ -1,13 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="a" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#4ade80"/>
-      <stop offset=".45" stop-color="#2dd4bf"/>
-      <stop offset=".75" stop-color="#22d3ee"/>
-      <stop offset="1" stop-color="#a3e635"/>
+    <linearGradient id="kira-g" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff6a3d"/>
+      <stop offset=".5" stop-color="#f43f5e"/>
+      <stop offset="1" stop-color="#be123c"/>
     </linearGradient>
+    <radialGradient id="kira-h" cx="20" cy="10" r="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <rect width="64" height="64" rx="15" fill="#0c0e0d"/>
-  <path d="M32 9.5 15 16v12.3C15 39.1 22.3 47 32 50c9.7-3 17-10.9 17-21.7V16L32 9.5Z" fill="none" stroke="url(#a)" stroke-width="3.8" stroke-linejoin="round"/>
-  <path d="M32 19.5c.9 5.6 4.8 9.5 10.4 10.4-5.6.9-9.5 4.8-10.4 10.4-.9-5.6-4.8-9.5-10.4-10.4 5.6-.9 9.5-4.8 10.4-10.4Z" fill="url(#a)"/>
+  <rect width="64" height="64" rx="16" fill="url(#kira-g)"/>
+  <rect width="64" height="64" rx="16" fill="url(#kira-h)"/>
+  <g stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M21 17v30"/>
+    <path d="M29.5 30.5 42 47"/>
+    <path d="M22 35 37.5 22.5"/>
+  </g>
+  <path fill="#fff" d="M44.5 9c.9 4.65 2.85 6.6 7.5 7.5-4.65.9-6.6 2.85-7.5 7.5-.9-4.65-2.85-6.6-7.5-7.5 4.65-.9 6.6-2.85 7.5-7.5Z"/>
 </svg>
