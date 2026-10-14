@@ -99,7 +99,7 @@ svg { width: 18px; height: 18px; flex: none; display: block; }
 * { scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
 
 /* ---------- Marca ---------- */
-.logo { display: block; width: 28px; height: 28px; flex: none; border-radius: 8px; box-shadow: 0 4px 14px -4px var(--glow); }
+.logo { display: block; width: 30px; height: 30px; flex: none; border-radius: 9px; box-shadow: 0 4px 16px -4px var(--glow); }
 .grad-text { background: var(--aurora); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* ---------- Orb: a "presença" da IA ---------- */
@@ -150,7 +150,8 @@ svg { width: 18px; height: 18px; flex: none; display: block; }
 .collapsed .sidebar { border-right-color: transparent; padding-inline: 0; }
 .sb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 2px 12px 8px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); min-width: 0; }
-.brand-name { font-weight: 600; font-size: 17px; letter-spacing: -0.02em; }
+.brand-name { font-weight: 650; font-size: 18px; letter-spacing: .02em; }
+.brand-dot { display: inline-block; width: 5px; height: 5px; margin-left: 2px; border-radius: 50%; background: var(--aurora); vertical-align: 2px; }
 
 .sb-new {
   display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
