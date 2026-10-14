@@ -1,8 +1,8 @@
-# IAHack — IA para Cibersegurança
+# KIRA — IA para Cibersegurança
 
 Assistente de IA no estilo Claude, especialista em segurança da informação, rodando na Cloudflare (Pages + Pages Functions + Workers AI).
 
-**Produção:** https://iahack.pages.dev
+**Produção:** https://kira-cb0.pages.dev (também em https://iahack.pages.dev)
 
 ## Como funciona
 
@@ -53,9 +53,9 @@ npm run deploy                       # build + wrangler pages deploy --branch ma
 Chave padrão opcional para todos os visitantes:
 
 ```bash
-npx wrangler pages secret put ANTHROPIC_API_KEY --project-name iahack
+npx wrangler pages secret put ANTHROPIC_API_KEY --project-name kira
 ```
 
 ## Uso responsável
 
-O IAHack foi feito para defesa, desenvolvimento seguro, educação, CTFs e testes autorizados. O prompt de sistema orienta o modelo a recusar ataques sem autorização, criação de malware, roubo de credenciais e afins.
+A KIRA foi feita para defesa, desenvolvimento seguro, educação, CTFs e testes autorizados. O prompt de sistema orienta o modelo a recusar ataques sem autorização, criação de malware, roubo de credenciais e afins.

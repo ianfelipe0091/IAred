@@ -38,7 +38,7 @@ const STARTERS = [
 const state = {
   chatId: null,
   streaming: null, // { controller, chatId, msgId }
-  defaultLabel: "IAHack Free",
+  defaultLabel: "KIRA Free",
 };
 
 // ---------------- Utilidades ----------------

@@ -16,7 +16,7 @@ export const CLAUDE = {
 
 export const FREE = {
   id: "free",
-  label: "IAHack Free",
+  label: "KIRA Free",
   model: "@cf/nvidia/nemotron-3-120b-a12b",
   maxTokens: 16000,
   contextTokens: 200000,

@@ -1,8 +1,8 @@
 {
-  "name": "iahack",
+  "name": "kira",
   "version": "1.0.0",
   "private": true,
-  "description": "IAHack — assistente de IA para hackers éticos e profissionais de cibersegurança. Roda em Cloudflare Pages + Workers AI.",
+  "description": "KIRA — assistente de IA especialista em cibersegurança. Roda em Cloudflare Pages + Workers AI.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
