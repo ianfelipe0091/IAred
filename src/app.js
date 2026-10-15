@@ -89,21 +89,34 @@ function persist() {
 // Modelo escolhido pelo usuário; se não estiver disponível, usa o primeiro (a IA do painel).
 const currentModel = () => state.models.find((m) => m.id === state.choice) || state.models[0];
 
+// Monta a lista só quando os modelos mudam; trocar a escolha só move a marcação,
+// para não perder o toque nem o foco no meio da troca.
+let renderedModels = "";
+
 function renderEngine() {
-  const { label, free } = currentModel();
+  const { id: active, label, free } = currentModel();
   els.engineLabel.textContent = label;
   els.engineSub.textContent = label;
   els.engineDot.classList.toggle("on", !free);
-  const active = currentModel().id;
-  els.modelPlans.innerHTML = state.models
-    .map(
-      (m) => `<button type="button" class="plan ${m.id === active ? "active" : ""}" data-model="${escapeHtml(m.id)}" role="radio" aria-checked="${m.id === active}">
+
+  const key = JSON.stringify(state.models);
+  if (key !== renderedModels) {
+    renderedModels = key;
+    els.modelPlans.innerHTML = state.models
+      .map(
+        (m) => `<button type="button" class="plan" data-model="${escapeHtml(m.id)}" role="radio">
         <span class="plan-icon ${m.free ? "" : "plan-icon-ai"}">${icon(m.free ? "bolt" : "sparkle")}</span>
         <span class="plan-text"><b>${escapeHtml(m.label)}</b><small>${m.free ? "Gratuito · Cloudflare Workers AI" : "Mais inteligente · definido pelo administrador"}</small></span>
         <span class="plan-check">${icon("check")}</span>
       </button>`,
-    )
-    .join("");
+      )
+      .join("");
+  }
+  els.modelPlans.querySelectorAll("[data-model]").forEach((b) => {
+    const on = b.dataset.model === active;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-checked", String(on));
+  });
 }
 
 async function loadEngine() {
