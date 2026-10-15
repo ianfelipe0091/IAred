@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { loadAIConfig, loadFreeConfig } from "./config.js";
+import { loadModels } from "./config.js";
 
 // Todos os provedores emitem os mesmos eventos para o frontend:
 //   { type: "thinking", text }   trecho do raciocínio
@@ -7,50 +7,39 @@ import { loadAIConfig, loadFreeConfig } from "./config.js";
 //   { type: "notice", text }     aviso curto
 //   { type: "usage", input, output }
 
-export const FREE = {
-  id: "free",
-  label: "KIRA Free",
-  provider: "Cloudflare Workers AI",
-  model: "@cf/nvidia/nemotron-3-120b-a12b",
-  maxTokens: 16000,
-  contextTokens: 200000,
-};
+// Modelo do Workers AI, usado só como reserva sem nome quando nenhum modelo foi configurado.
+const RESERVE_MODEL = "@cf/nvidia/nemotron-3-120b-a12b";
+const RESERVE_LABEL = "KIRA";
+const RESERVE_ID = "reserva";
 
-// Chave padrão antiga (secret ANTHROPIC_API_KEY), usada quando o painel não tem configuração.
-const LEGACY_CLAUDE = {
-  provider: "Anthropic",
-  format: "anthropic",
-  model: "claude-opus-5-5",
-  label: "Claude Opus 5.5",
-  contextTokens: 900000,
-  maxOutput: 64000,
-  options: { thinking: true, effort: "high", cache: true, fallbacks: true },
-};
-
-// Modelos que o usuário pode escolher: a IA do painel (ou a chave padrão antiga) e a opção gratuita,
-// que usa a OpenRouter quando o admin configurou e, senão, o Workers AI do Cloudflare.
+// Modelos que o usuário pode escolher: os configurados no painel, com o padrão primeiro.
+// Sem nenhum modelo, cai no Workers AI do Cloudflare (reserva, sem mostrar o nome do provedor).
 export async function availableEngines(env) {
-  const [config, freeConfig] = await Promise.all([loadAIConfig(env), loadFreeConfig(env)]);
-  const main = config || (env.ANTHROPIC_API_KEY ? { ...LEGACY_CLAUDE, apiKey: env.ANTHROPIC_API_KEY } : null);
-  const engines = main ? [engineFromConfig(main)] : [];
-  if (freeConfig) {
-    engines.push({ ...engineFromConfig(freeConfig), id: FREE.id, label: FREE.label, provider: freeConfig.provider });
-  } else if (env.AI) {
-    engines.push({
-      ...FREE,
-      stream: (args) => streamWorkersAI(env, args),
-      describeError: describeWorkersAIError,
-    });
+  const { list, defaultId } = await loadModels(env);
+  if (list.length) {
+    const ordered = [...list].sort((a, b) => (b.id === defaultId ? 1 : 0) - (a.id === defaultId ? 1 : 0));
+    return ordered.map((m) => ({ ...engineFromConfig(m), id: m.id, label: m.label || m.model }));
   }
-  return engines;
+  if (env.AI) {
+    return [
+      {
+        id: RESERVE_ID,
+        label: RESERVE_LABEL,
+        model: RESERVE_MODEL,
+        maxTokens: 16000,
+        contextTokens: 200000,
+        stream: (args) => streamWorkersAI(env, args),
+        describeError: describeWorkersAIError,
+      },
+    ];
+  }
+  return [];
 }
 
-// Modelo da conversa: o gratuito se o usuário escolheu, senão a IA do painel.
+// Engine da conversa: o modelo escolhido pelo usuário (pelo id), senão o primeiro (o padrão).
 export async function resolveEngine(env, choice) {
   const engines = await availableEngines(env);
-  const free = engines.find((e) => e.id === FREE.id);
-  const main = engines.find((e) => e.id !== FREE.id);
-  return (choice === FREE.id ? free || main : main || free) || null;
+  return engines.find((e) => e.id === choice) || engines[0] || null;
 }
 
 export function engineFromConfig(config) {
@@ -84,11 +73,11 @@ function alternate(messages) {
 
 export async function* streamWorkersAI(env, { system, messages, signal }) {
   const stream = await env.AI.run(
-    FREE.model,
+    RESERVE_MODEL,
     {
       messages: [{ role: "system", content: system }, ...messages],
       stream: true,
-      max_tokens: FREE.maxTokens,
+      max_tokens: 16000,
     },
     { signal },
   );

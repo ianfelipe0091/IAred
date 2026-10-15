@@ -46,8 +46,8 @@ const STARTERS = [
 const state = {
   chatId: null,
   streaming: null, // { controller, chatId, msgId }
-  models: [{ id: "free", label: "KIRA Free", free: true }],
-  choice: store.getPref("model") || "main",
+  models: [{ id: "default", label: "KIRA" }],
+  choice: store.getPref("model") || "",
   user: null,
   authMode: "login",
 };
@@ -86,7 +86,7 @@ function persist() {
 
 // ---------------- Modelo ativo ----------------
 
-// Modelo escolhido pelo usuário; se não estiver disponível, usa o primeiro (a IA do painel).
+// Modelo escolhido pelo usuário; se não estiver na lista, usa o primeiro (o padrão).
 const currentModel = () => state.models.find((m) => m.id === state.choice) || state.models[0];
 
 // Monta a lista só quando os modelos mudam; trocar a escolha só move a marcação,
@@ -94,26 +94,29 @@ const currentModel = () => state.models.find((m) => m.id === state.choice) || st
 let renderedModels = "";
 
 function renderEngine() {
-  const { id: active, label, free } = currentModel();
-  els.engineLabel.textContent = label;
-  els.engineSub.textContent = label;
-  els.engineDot.classList.toggle("on", !free);
+  const current = currentModel();
+  const only = state.models.length < 2;
+  els.engineLabel.textContent = current.label;
+  els.engineSub.textContent = current.label;
+  els.engineDot.classList.toggle("on", true);
 
   const key = JSON.stringify(state.models);
   if (key !== renderedModels) {
     renderedModels = key;
     els.modelPlans.innerHTML = state.models
       .map(
-        (m) => `<button type="button" class="plan" data-model="${escapeHtml(m.id)}" role="radio">
-        <span class="plan-icon ${m.free ? "" : "plan-icon-ai"}">${icon(m.free ? "bolt" : "sparkle")}</span>
-        <span class="plan-text"><b>${escapeHtml(m.label)}</b><small>${m.free ? `Gratuito · ${escapeHtml(m.provider || "Cloudflare Workers AI")}` : "Mais inteligente · definido pelo administrador"}</small></span>
+        (m, i) => `<button type="button" class="plan" data-model="${escapeHtml(m.id)}" role="radio">
+        <span class="plan-icon plan-icon-ai">${icon("sparkle")}</span>
+        <span class="plan-text"><b>${escapeHtml(m.label)}</b><small>${i === 0 ? "Padrão" : "Modelo de IA"}</small></span>
         <span class="plan-check">${icon("check")}</span>
       </button>`,
       )
       .join("");
+    // Com um modelo só não há o que escolher: a seção de modelos some.
+    document.getElementById("model-section").hidden = only;
   }
   els.modelPlans.querySelectorAll("[data-model]").forEach((b) => {
-    const on = b.dataset.model === active;
+    const on = b.dataset.model === current.id;
     b.classList.toggle("active", on);
     b.setAttribute("aria-checked", String(on));
   });

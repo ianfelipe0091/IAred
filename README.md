@@ -6,57 +6,11 @@ Assistente de IA no estilo Claude, especialista em segurança da informação, r
 
 ## Como funciona
 
-O administrador escolhe a IA que todos os usuários vão usar no **painel administrativo** (`/admin`): cola a **URL da API** e o **token**, e o KIRA reconhece o provedor sozinho.
+No **painel administrativo** (`/admin`) você conecta um ou mais **modelos de IA**. Cada modelo é uma conexão própria: URL da API + token + modelo, e o KIRA reconhece o provedor sozinho (Anthropic/Claude, OpenAI, OpenRouter, Google Gemini, DeepSeek, Mistral, Groq e qualquer API no formato da Anthropic ou da OpenAI). Você marca um como padrão; o usuário escolhe entre os modelos no app. Sem nenhum modelo configurado, o KIRA usa um modelo gratuito de reserva (Cloudflare Workers AI), sem mostrar esse nome.
 
-- **Anthropic (Claude):** `https://api.anthropic.com`. O app usa raciocínio adaptativo, esforço e fallback automático quando o modelo escolhido aceita.
-- **Compatíveis com a OpenAI:** OpenAI, OpenRouter, Groq, Google Gemini, DeepSeek, Mistral, xAI, Perplexity, Together, Fireworks, Cerebras, Maritaca e qualquer outra API no formato Chat Completions.
-- **Sem configuração:** usa o modelo gratuito (NVIDIA Nemotron 3 120B no Workers AI).
+Os usuários não colam chave nenhuma: os tokens ficam só no servidor (KV da Cloudflare) e nunca vão para o navegador.
 
-Os usuários não colam chave nenhuma: o token fica só no servidor (KV da Cloudflare) e nunca é enviado ao navegador.
-
-**Cadastro e login dos usuários** (Supabase Auth): quando o admin ativa no painel, só quem tem conta usa o KIRA. A tela inicial passa a ter "Entrar" e "Criar conta" (email e senha), o servidor confere o token de cada mensagem na Supabase e o histórico de conversas fica separado por conta no navegador.
-
-## Recursos
-
-- Chat em streaming com Markdown, realce de sintaxe e botão de copiar código.
-- Raciocínio do modelo visível em um bloco recolhível.
-- Histórico local de conversas com títulos automáticos.
-- Editar mensagem, gerar novamente e parar a resposta (Esc).
-- Visual de produto de IA: orb animado como "presença" da IA, composer flutuante com anel em gradiente enquanto a resposta é gerada e sugestões iniciais.
-- Barra lateral recolhível (Ctrl+B), nova conversa (Ctrl+K), botão de voltar ao fim da conversa.
-- Tema claro/escuro automático (segue o sistema) e layout para celular.
-- Cabeçalhos de segurança (CSP restritiva, HSTS, X-Frame-Options) e saída sanitizada com DOMPurify.
-
-## Estrutura
-
-```
-functions/
-  api/chat.js         POST /api/chat  → streaming SSE (Claude ou modelo gratuito)
-  api/model.js        GET  /api/model → modelo ativo (para o app)
-  api/auth/config.js  GET  /api/auth/config → URL e chave pública da Supabase (para o login)
-  api/title.js        POST /api/title → título automático
-  api/admin/*         login, reconhecimento do provedor e configuração da IA
-  _lib/prompt.js      prompt de sistema do especialista
-  _lib/providers.js   integração com Anthropic, APIs compatíveis com OpenAI e Workers AI
-  _lib/detect.js      reconhece o provedor pela URL/token e testa a conexão
-  _lib/admin-auth.js  usuário/senha do admin, sessão assinada e limite de tentativas
-  _lib/auth.js        login dos usuários: configuração da Supabase e validação do token
-src/                  frontend (JS puro, empacotado com esbuild); admin.* é o painel
-public/               estáticos (ícones, manifest, _headers)
-build.mjs             gera dist/
-wrangler.toml         configuração do Pages (bindings AI e CONFIG, SUPABASE_URL)
-```
-
-## Desenvolvimento e deploy
-
-```bash
-npm install
-npm run build
-
-export CLOUDFLARE_API_TOKEN=...      # token com permissão de Pages e Workers AI
-export CLOUDFLARE_ACCOUNT_ID=...
-npm run deploy                       # build + wrangler pages deploy --branch main
-```
+**Instruções:** você escreve instruções que vão para o modelo em todas as conversas, podendo valer para todos os modelos ou só para alguns. A instrução do administrador tem prioridade sobre o estilo padrão da KIRA; as regras de uso responsável do prompt padrão continuam valendo e não podem ser desligadas por instrução. O painel mostra o texto exato enviado ao modelo.
 
 ## Painel administrativo
 
@@ -83,13 +37,11 @@ Depois, abra `https://kira-cb0.pages.dev/admin`, entre com o usuário e a senha 
 
 A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagação do KV).
 
-### Instruções para o modelo
+### Modelos e instruções
 
-Na página **Instruções** do painel, escreva o que o modelo deve seguir em todas as conversas (tom, público, formato, informações do seu negócio), até 8.000 caracteres. O texto entra no prompt de sistema depois do prompt padrão da KIRA, cujas regras de uso responsável continuam valendo; em branco, só o prompt padrão é usado.
+Na página **Modelos** do painel, adicione um ou mais modelos (URL + token + modelo; há atalhos para OpenRouter, Anthropic, OpenAI, Gemini e Groq). O painel reconhece o provedor, lista os modelos, testa o escolhido e só então salva. Marque o padrão com **Tornar padrão** e remova com a lixeira.
 
-### Opção gratuita (KIRA Free)
-
-Os usuários escolhem entre a IA principal e o **KIRA Free**. Por padrão, o KIRA Free usa o Nemotron 3 Super 120B do Cloudflare Workers AI (10.000 neurons grátis por dia na conta). No cartão **Opção gratuita** do painel dá para trocá-lo por um modelo da **OpenRouter**: cole a chave da API (openrouter.ai/settings/keys), clique em **Carregar modelos** (os gratuitos, terminados em `:free`, aparecem primeiro) e salve. O painel confere a chave e testa o modelo antes de salvar. A IA principal também aceita a OpenRouter (`https://openrouter.ai/api/v1`, há um atalho no painel).
+Na página **Instruções**, escolha se valem para **todos os modelos** ou **modelos específicos**, escreva o texto (até 8.000 caracteres) e use **Ver o que é enviado ao modelo** para conferir o prompt completo. A instrução tem prioridade sobre o estilo padrão; o uso responsável prevalece sempre.
 
 ### Login dos usuários
 

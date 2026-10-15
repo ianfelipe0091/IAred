@@ -19,7 +19,7 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  // Modelo definido pelo administrador no painel (ou o gratuito, se não houver).
+  // Modelo escolhido pelo usuário (ou o padrão, se não houver escolha).
   const engine = await resolveEngine(env, body.model);
   if (!engine) {
     return json({ error: "Nenhum modelo de IA disponível. O administrador precisa configurar a IA no painel." }, 503);
@@ -34,7 +34,11 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Conversa grande demais. Inicie uma nova conversa." }, 413);
   }
 
-  const system = buildSystemPrompt((await loadPromptConfig(env))?.instructions);
+  // Instruções do admin, só se valerem para o modelo escolhido (todos, ou a lista de alvos).
+  const promptConfig = await loadPromptConfig(env);
+  const targets = promptConfig?.targets;
+  const applies = promptConfig?.instructions && (!targets || targets === "all" || (Array.isArray(targets) && targets.includes(engine.id)));
+  const system = buildSystemPrompt(applies ? promptConfig.instructions : "");
   const { kept, dropped } = fitToContext(messages, engine, system);
   if (!kept.length) {
     return json({ error: "Sua mensagem é grande demais. Reduza o texto e tente de novo." }, 413);

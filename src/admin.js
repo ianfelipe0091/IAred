@@ -16,36 +16,25 @@ const els = {
   pageTitle: $("#page-title"),
   pageDesc: $("#page-desc"),
   stats: $("#stats"),
-  status: $("#status"),
-  statusFoot: $("#status-foot"),
-  form: $("#config-form"),
+  modelList: $("#model-list"),
+  modelForm: $("#model-form"),
   url: $("#url"),
   token: $("#token"),
-  tokenHint: $("#token-hint"),
   detect: $("#detect"),
   detected: $("#detected"),
   model: $("#model"),
   models: $("#models"),
   label: $("#label"),
   format: $("#format"),
-  configStatus: $("#config-status"),
-  remove: $("#remove"),
-  save: $("#save"),
+  modelStatus: $("#model-status"),
+  modelAdd: $("#model-add"),
   toasts: $("#toasts"),
-  freeForm: $("#free-form"),
-  freeState: $("#free-state"),
-  freeCfHelp: $("#free-cf-help"),
-  freeOr: $("#free-or"),
-  freeToken: $("#free-token"),
-  freeList: $("#free-list"),
-  freeDetected: $("#free-detected"),
-  freeModel: $("#free-model"),
-  freeModels: $("#free-models"),
-  freeStatus: $("#free-status"),
-  freeSave: $("#free-save"),
   promptForm: $("#prompt-form"),
+  promptScope: $("#prompt-scope"),
+  promptTargets: $("#prompt-targets"),
   promptText: $("#prompt-text"),
   promptCounter: $("#prompt-counter"),
+  promptPreview: $("#prompt-preview"),
   promptStatus: $("#prompt-status"),
   promptSave: $("#prompt-save"),
   sbForm: $("#sb-form"),
@@ -58,24 +47,22 @@ const els = {
 };
 
 const FORMAT_LABEL = { anthropic: "API da Anthropic", openai: "compatível com OpenAI" };
-const TOKEN_HINT = els.tokenHint.textContent;
-const CLOUDFLARE_MODEL = "Nemotron 3 Super 120B";
 
 const PAGES = {
   "visao-geral": { title: "Visão geral", desc: "Como o KIRA está configurado para os seus usuários." },
-  ia: { title: "IA principal", desc: "O modelo padrão do KIRA. Conecte qualquer API no formato da Anthropic ou da OpenAI." },
-  gratuita: { title: "KIRA Free", desc: "A opção gratuita que os usuários podem escolher no app." },
-  instrucoes: { title: "Instruções", desc: "Personalize o comportamento do modelo em todas as conversas." },
+  modelos: { title: "Modelos", desc: "Conecte um ou mais modelos. Os usuários escolhem entre eles no app." },
+  instrucoes: { title: "Instruções", desc: "Personalize o comportamento do modelo nas conversas." },
   usuarios: { title: "Login dos usuários", desc: "Cadastro e login com a Supabase." },
 };
 
 const state = {
-  config: null, // IA principal salva (sem o token)
-  free: null, // opção gratuita salva (sem o token)
-  freeSource: "cloudflare",
-  auth: null, // login dos usuários
-  prompt: null, // instruções do admin
-  names: new Map(), // id do modelo → nome amigável
+  models: [], // modelos salvos (sem token)
+  defaultId: null,
+  auth: null,
+  prompt: null,
+  scope: "all", // "all" ou "some"
+  targets: [], // ids marcados quando scope = "some"
+  names: new Map(),
 };
 
 const esc = (text) =>
@@ -83,6 +70,7 @@ const esc = (text) =>
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 const fmtNumber = (n) => n.toLocaleString("pt-BR");
+const modelLabel = (m) => m.label || m.model;
 
 function toast(text, kind = "info") {
   const el = document.createElement("div");
@@ -115,9 +103,7 @@ async function api(path, method = "GET", body) {
   } catch {
     // resposta sem JSON
   }
-  if (res.status === 401 && path !== "login") {
-    showLogin("Sua sessão expirou. Entre de novo.");
-  }
+  if (res.status === 401 && path !== "login") showLogin("Sua sessão expirou. Entre de novo.");
   if (!res.ok) throw new Error(data.error || `Erro HTTP ${res.status}`);
   return data;
 }
@@ -181,10 +167,7 @@ $("#logout").addEventListener("click", async () => {
 
 // ---------------- Navegação ----------------
 
-function currentPage() {
-  const page = location.hash.slice(1);
-  return PAGES[page] ? page : "visao-geral";
-}
+const currentPage = () => (PAGES[location.hash.slice(1)] ? location.hash.slice(1) : "visao-geral");
 
 function renderPage() {
   const page = currentPage();
@@ -192,8 +175,7 @@ function renderPage() {
   document.querySelectorAll("[data-nav]").forEach((el) => {
     const on = el.dataset.nav === page;
     el.classList.toggle("active", on);
-    if (on) el.setAttribute("aria-current", "page");
-    else el.removeAttribute("aria-current");
+    el.toggleAttribute("aria-current", on);
   });
   els.pageTitle.textContent = PAGES[page].title;
   els.pageDesc.textContent = PAGES[page].desc;
@@ -210,7 +192,7 @@ function stat({ page, iconName, title, badge, value, meta, mono = false }) {
       <div class="stat-top">
         <span class="stat-icon">${icon(iconName)}</span>
         <span class="stat-title">${title}</span>
-        <span class="badge ${badge.kind}">${badge.text}</span>
+        <span class="badge ${badge.kind}">${esc(badge.text)}</span>
       </div>
       <div class="stat-value">${esc(value)}</div>
       <div class="stat-meta ${mono ? "mono" : ""}">${esc(meta)}</div>
@@ -219,29 +201,22 @@ function stat({ page, iconName, title, badge, value, meta, mono = false }) {
 }
 
 function renderOverview() {
-  const c = state.config;
-  const f = state.free;
+  const count = state.models.length;
+  const def = state.models.find((m) => m.id === state.defaultId) || state.models[0];
   const a = state.auth;
-  const p = state.prompt;
-  const freeOr = f?.source === "openrouter";
-  const chars = p?.instructions?.length || 0;
+  const chars = state.prompt?.instructions?.length || 0;
+  const targetsLabel =
+    !chars || !state.prompt ? "" : state.prompt.targets === "all" ? "todos os modelos" : `${(state.prompt.targets || []).length} modelo(s)`;
 
   els.stats.innerHTML = [
     stat({
-      page: "ia",
+      page: "modelos",
       iconName: "sparkle",
-      title: "IA principal",
-      badge: c ? { kind: "ok", text: "Ativa" } : { kind: "warn", text: "Não configurada" },
-      value: c ? c.label || c.model : "Nenhuma IA conectada",
-      meta: c ? `${c.provider} · ${c.model}` : "Os usuários só têm a opção gratuita.",
-    }),
-    stat({
-      page: "gratuita",
-      iconName: "bolt",
-      title: "KIRA Free",
-      badge: { kind: "ok", text: freeOr ? "OpenRouter" : "Cloudflare" },
-      value: freeOr ? f.model : CLOUDFLARE_MODEL,
-      meta: freeOr ? "Conectado com a sua chave da OpenRouter." : "Incluído no Cloudflare Workers AI.",
+      title: "Modelos",
+      badge: count ? { kind: "ok", text: count === 1 ? "1 modelo" : `${count} modelos` } : { kind: "warn", text: "Nenhum" },
+      value: count ? modelLabel(def) : "Modelo de reserva",
+      meta: count ? `Padrão · ${def.model}` : "Adicione um modelo. Sem nenhum, o KIRA usa um modelo gratuito de reserva.",
+      mono: count > 0,
     }),
     stat({
       page: "instrucoes",
@@ -249,7 +224,7 @@ function renderOverview() {
       title: "Instruções",
       badge: chars ? { kind: "ok", text: "Definidas" } : { kind: "", text: "Padrão" },
       value: chars ? `${fmtNumber(chars)} caracteres` : "Só o prompt padrão",
-      meta: chars ? `Atualizadas em ${fmtDate(p.updatedAt)}.` : "Nenhuma instrução extra para o modelo.",
+      meta: chars ? `Para ${targetsLabel}. Atualizadas em ${fmtDate(state.prompt.updatedAt)}.` : "Nenhuma instrução extra.",
     }),
     stat({
       page: "usuarios",
@@ -262,8 +237,7 @@ function renderOverview() {
     }),
   ].join("");
 
-  $("#dot-ia").classList.toggle("ok", Boolean(c));
-  $("#dot-gratuita").classList.toggle("ok", Boolean(f));
+  $("#dot-modelos").classList.toggle("ok", count > 0);
   $("#dot-instrucoes").classList.toggle("ok", chars > 0);
   $("#dot-usuarios").classList.toggle("ok", Boolean(a?.enabled));
 }
@@ -280,54 +254,70 @@ async function showPanel(user) {
   setAdmin(user);
   renderPage();
   show("panel");
-  els.status.innerHTML = `<p class="help">Carregando…</p>`;
-  const [config] = await Promise.allSettled([api("config"), loadFree(), loadUserAuth(), loadPrompt()]);
-  if (config.status === "rejected") {
-    if (!els.views.panel.hidden) els.status.innerHTML = `<p class="key-status error">${esc(config.reason.message)}</p>`;
+  els.modelList.innerHTML = `<p class="help">Carregando…</p>`;
+  const [models] = await Promise.allSettled([api("models"), loadUserAuth(), loadPrompt()]);
+  if (models.status === "rejected") {
+    els.modelList.innerHTML = `<p class="key-status error">${esc(models.reason.message)}</p>`;
     return;
   }
-  state.config = config.value.config;
-  renderStatus();
-  fillForm();
+  setModelsState(models.value);
   renderOverview();
 }
 
-// ---------------- IA principal ----------------
+// ---------------- Modelos ----------------
 
-function renderStatus() {
-  const c = state.config;
-  els.statusFoot.hidden = !c;
-  if (!c) {
-    els.status.innerHTML = `<div class="empty"><b>Nenhuma IA conectada</b><span>Os usuários estão usando só a opção gratuita. Conecte uma IA abaixo.</span></div>`;
+function setModelsState({ models, defaultId }) {
+  state.models = models || [];
+  state.defaultId = defaultId;
+  renderModelList();
+  renderTargets(); // os alvos das instruções dependem da lista de modelos
+}
+
+function renderModelList() {
+  if (!state.models.length) {
+    els.modelList.innerHTML = `<div class="empty"><b>Nenhum modelo conectado</b><span>Adicione um modelo abaixo. Enquanto não houver nenhum, o KIRA responde com um modelo gratuito de reserva.</span></div>`;
     return;
   }
-  els.status.innerHTML = `
-    <dl class="facts">
-      <dt>Nome para os usuários</dt><dd><b>${esc(c.label || c.model)}</b></dd>
-      <dt>Provedor</dt><dd>${esc(c.provider)} · ${esc(FORMAT_LABEL[c.format] || c.format)}</dd>
-      <dt>Modelo</dt><dd class="mono">${esc(c.model)}</dd>
-      <dt>URL</dt><dd class="mono">${esc(c.baseURL)}</dd>
-      <dt>Token</dt><dd class="mono">${esc(c.tokenHint)}</dd>
-      <dt>Atualizado</dt><dd>${esc(fmtDate(c.updatedAt))}</dd>
-    </dl>`;
+  els.modelList.innerHTML = state.models
+    .map((m) => {
+      const isDefault = m.id === state.defaultId;
+      return `<div class="model-row">
+        <span class="model-mark">${icon("sparkle")}</span>
+        <div class="model-info">
+          <div class="model-name">${esc(modelLabel(m))}${isDefault ? `<span class="badge ok">Padrão</span>` : ""}</div>
+          <div class="model-sub mono">${esc(m.provider)} · ${esc(m.model)}</div>
+        </div>
+        <div class="model-actions">
+          ${isDefault ? "" : `<button type="button" class="btn ghost small" data-default="${esc(m.id)}">Tornar padrão</button>`}
+          <button type="button" class="icon-btn" data-remove="${esc(m.id)}" title="Remover" aria-label="Remover modelo">${icon("trash")}</button>
+        </div>
+      </div>`;
+    })
+    .join("");
 }
 
-function fillForm() {
-  const c = state.config;
-  els.url.value = c?.baseURL || "";
-  els.token.value = "";
-  els.token.placeholder = c ? `Salvo: ${c.tokenHint}` : "sk-…";
-  els.tokenHint.textContent = c
-    ? "Deixe em branco para manter o token salvo. Se trocar a URL, cole o token de novo."
-    : TOKEN_HINT;
-  els.model.value = c?.model || "";
-  els.label.value = c?.label || "";
-  els.format.value = "auto";
-  els.detected.textContent = "";
-  setStatus(els.configStatus, "");
-}
+els.modelList.addEventListener("click", async (e) => {
+  const def = e.target.closest("[data-default]");
+  const del = e.target.closest("[data-remove]");
+  try {
+    if (def) {
+      setModelsState(await api("models", "PUT", { defaultId: def.dataset.default }));
+      renderOverview();
+      toast("Modelo padrão atualizado");
+    } else if (del) {
+      const m = state.models.find((x) => x.id === del.dataset.remove);
+      if (!m || !confirm(`Remover "${modelLabel(m)}"?`)) return;
+      setModelsState(await api("models", "DELETE", { id: del.dataset.remove }));
+      renderOverview();
+      loadPrompt();
+      toast("Modelo removido");
+    }
+  } catch (err) {
+    setStatus(els.modelStatus, err.message, "error");
+  }
+});
 
-function formData() {
+function addForm() {
   return {
     url: els.url.value.trim(),
     token: els.token.value.trim(),
@@ -337,7 +327,7 @@ function formData() {
   };
 }
 
-function setModels(models) {
+function setDetectedModels(models) {
   state.names = new Map(models.map((m) => [m.id, m.name]));
   els.models.innerHTML = models
     .map((m) => `<option value="${esc(m.id)}">${m.name !== m.id ? esc(m.name) : ""}</option>`)
@@ -346,8 +336,7 @@ function setModels(models) {
 }
 
 function updateLabelPlaceholder() {
-  const name = state.names.get(els.model.value.trim());
-  els.label.placeholder = name || els.model.value.trim() || "Usa o nome do modelo";
+  els.label.placeholder = state.names.get(els.model.value.trim()) || els.model.value.trim() || "Usa o nome do modelo";
 }
 
 $("#presets").addEventListener("click", (e) => {
@@ -364,8 +353,8 @@ els.detect.addEventListener("click", async () => {
   els.detected.className = "detected";
   els.detected.textContent = "Reconhecendo…";
   try {
-    const d = await api("detect", "POST", formData());
-    setModels(d.models);
+    const d = await api("detect", "POST", addForm());
+    setDetectedModels(d.models);
     if (!els.model.value.trim() || (d.models.length && !state.names.has(els.model.value.trim()))) {
       els.model.value = d.suggested || "";
     }
@@ -373,7 +362,7 @@ els.detect.addEventListener("click", async () => {
     if (!els.url.value.trim()) els.url.value = d.baseURL;
     const count = d.models.length ? ` · ${d.models.length} modelo${d.models.length > 1 ? "s" : ""}` : "";
     els.detected.innerHTML = `${icon("check")}<span>${esc(d.provider)} · ${esc(d.formatLabel)}${count}</span>`;
-    if (d.warning) setStatus(els.configStatus, d.warning);
+    if (d.warning) setStatus(els.modelStatus, d.warning);
     if (!els.model.value) els.model.focus();
   } catch (err) {
     els.detected.className = "detected error";
@@ -383,44 +372,25 @@ els.detect.addEventListener("click", async () => {
   }
 });
 
-els.model.addEventListener("input", () => {
-  // Trocou de modelo sem mexer no nome: o nome antigo deixa de valer.
-  if (state.config && els.label.value === state.config.label && els.model.value.trim() !== state.config.model) {
-    els.label.value = "";
-  }
-  updateLabelPlaceholder();
-});
+els.model.addEventListener("input", updateLabelPlaceholder);
 
-els.form.addEventListener("submit", async (e) => {
+els.modelForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  els.save.disabled = true;
-  setStatus(els.configStatus, "Testando a conexão com a IA… pode levar alguns segundos.");
+  els.modelAdd.disabled = true;
+  setStatus(els.modelStatus, "Testando a conexão com a IA… pode levar alguns segundos.");
   try {
-    const { config } = await api("config", "PUT", formData());
-    state.config = config;
-    renderStatus();
-    fillForm();
+    setModelsState(await api("models", "POST", addForm()));
+    els.modelForm.reset();
+    els.detected.textContent = "";
+    state.names = new Map();
     renderOverview();
-    setStatus(els.configStatus, `Salvo. Os usuários já estão usando ${config.label}.`, "ok");
-    toast("Configuração salva");
+    loadPrompt();
+    setStatus(els.modelStatus, "Modelo adicionado.", "ok");
+    toast("Modelo adicionado");
   } catch (err) {
-    setStatus(els.configStatus, err.message, "error");
+    setStatus(els.modelStatus, err.message, "error");
   } finally {
-    els.save.disabled = false;
-  }
-});
-
-els.remove.addEventListener("click", async () => {
-  if (!confirm("Remover a IA configurada? Os usuários ficam só com a opção gratuita.")) return;
-  try {
-    await api("config", "DELETE");
-    state.config = null;
-    renderStatus();
-    fillForm();
-    renderOverview();
-    toast("Configuração removida");
-  } catch (err) {
-    setStatus(els.configStatus, err.message, "error");
+    els.modelAdd.disabled = false;
   }
 });
 
@@ -431,103 +401,53 @@ $("#toggle-token").addEventListener("click", (e) => {
   e.currentTarget.setAttribute("aria-label", reveal ? "Esconder token" : "Mostrar token");
 });
 
-// ---------------- KIRA Free ----------------
-
-function setFreeSource(source) {
-  state.freeSource = source;
-  els.freeForm.querySelectorAll("[data-source]").forEach((b) => {
-    b.classList.toggle("active", b.dataset.source === source);
-    b.setAttribute("aria-checked", String(b.dataset.source === source));
-  });
-  els.freeOr.hidden = source !== "openrouter";
-  els.freeCfHelp.hidden = source !== "cloudflare";
-}
-
-function renderFree(free) {
-  state.free = free;
-  const or = free.source === "openrouter";
-  els.freeState.innerHTML = or
-    ? `<span class="badge ok">OpenRouter</span><span class="mono-inline">${esc(free.model)}</span>`
-    : `<span class="badge ok">Cloudflare</span><span>${CLOUDFLARE_MODEL} no Workers AI</span>`;
-  els.freeToken.value = "";
-  els.freeToken.placeholder = or && free.tokenHint ? `Salva: ${free.tokenHint}` : "sk-or-v1-…";
-  els.freeModel.value = or ? free.model : els.freeModel.value;
-  setFreeSource(free.source);
-}
-
-async function loadFree() {
-  try {
-    renderFree(await api("free"));
-  } catch (err) {
-    setStatus(els.freeStatus, err.message, "error");
-  }
-}
-
-els.freeForm.querySelectorAll("[data-source]").forEach((b) =>
-  b.addEventListener("click", () => {
-    setFreeSource(b.dataset.source);
-    setStatus(els.freeStatus, "");
-    if (b.dataset.source === "openrouter" && !els.freeModel.value) {
-      els.freeModel.value = "nvidia/nemotron-3-super-120b-a12b:free";
-    }
-  }),
-);
-
-els.freeList.addEventListener("click", async () => {
-  els.freeList.disabled = true;
-  els.freeDetected.className = "detected";
-  els.freeDetected.textContent = "Conferindo a chave…";
-  try {
-    const { models, freeTier } = await api("free", "POST", { token: els.freeToken.value.trim() });
-    els.freeModels.innerHTML = models
-      .map((m) => `<option value="${esc(m.id)}">${m.free ? "Grátis · " : ""}${esc(m.name)}</option>`)
-      .join("");
-    const free = models.filter((m) => m.free).length;
-    const account = freeTier ? " · conta sem créditos (50 mensagens/dia nos grátis)" : "";
-    els.freeDetected.innerHTML = `${icon("check")}<span>Chave válida · ${models.length} modelos, ${free} grátis${esc(account)}</span>`;
-  } catch (err) {
-    els.freeDetected.className = "detected error";
-    els.freeDetected.textContent = err.message;
-  } finally {
-    els.freeList.disabled = false;
-  }
-});
-
-els.freeForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  els.freeSave.disabled = true;
-  try {
-    if (state.freeSource === "cloudflare") {
-      renderFree(await api("free", "DELETE"));
-      setStatus(els.freeStatus, "A opção gratuita voltou a usar o Cloudflare Workers AI.", "ok");
-    } else {
-      setStatus(els.freeStatus, "Testando o modelo na OpenRouter… pode levar alguns segundos.");
-      renderFree(await api("free", "PUT", { token: els.freeToken.value.trim(), model: els.freeModel.value.trim() }));
-      setStatus(els.freeStatus, "Salvo. O KIRA Free agora usa a OpenRouter.", "ok");
-    }
-    renderOverview();
-    toast("Opção gratuita salva");
-  } catch (err) {
-    setStatus(els.freeStatus, err.message, "error");
-  } finally {
-    els.freeSave.disabled = false;
-  }
-});
-
 // ---------------- Instruções ----------------
 
 function updateCounter() {
   const max = Number(els.promptText.maxLength) || 8000;
-  const used = els.promptText.value.length;
-  els.promptCounter.textContent = `${fmtNumber(used)} / ${fmtNumber(max)}`;
-  els.promptCounter.classList.toggle("near", used > max * 0.9);
+  els.promptCounter.textContent = `${fmtNumber(els.promptText.value.length)} / ${fmtNumber(max)}`;
+  els.promptCounter.classList.toggle("near", els.promptText.value.length > max * 0.9);
 }
 
-function renderPrompt(prompt) {
-  state.prompt = prompt;
-  if (prompt.max) els.promptText.maxLength = prompt.max;
-  els.promptText.value = prompt.instructions || "";
+function setScope(scope) {
+  state.scope = scope;
+  els.promptScope.querySelectorAll("[data-scope]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.scope === scope);
+    b.setAttribute("aria-checked", String(b.dataset.scope === scope));
+  });
+  els.promptTargets.hidden = scope !== "some";
+}
+
+function renderTargets() {
+  els.promptTargets.innerHTML = state.models.length
+    ? state.models
+        .map(
+          (m) => `<label class="check"><input type="checkbox" value="${esc(m.id)}" ${state.targets.includes(m.id) ? "checked" : ""} />${esc(modelLabel(m))}</label>`,
+        )
+        .join("")
+    : `<p class="help">Nenhum modelo para escolher. Adicione modelos na página Modelos.</p>`;
+}
+
+// Monta o preview ao vivo, na mesma ordem do servidor (buildSystemPrompt).
+function updatePreview() {
+  const p = state.promptParts;
+  if (!p) return;
+  const text = els.promptText.value.trim();
+  const blocks = [p.identity, p.responsible, text ? `${p.intro}\n\n${text}` : "", p.style, p.date].filter(Boolean);
+  els.promptPreview.textContent = blocks.join("\n\n");
+}
+
+function renderPrompt(data) {
+  state.prompt = { instructions: data.instructions, targets: data.targets, updatedAt: data.updatedAt };
+  state.promptParts = data.parts;
+  if (data.max) els.promptText.maxLength = data.max;
+  els.promptText.value = data.instructions || "";
+  state.targets = Array.isArray(data.targets) ? data.targets : [];
+  setScope(data.targets === "all" || !Array.isArray(data.targets) ? "all" : "some");
+  renderTargets();
   updateCounter();
+  updatePreview();
+  setStatus(els.promptStatus, "");
 }
 
 async function loadPrompt() {
@@ -538,8 +458,11 @@ async function loadPrompt() {
   }
 }
 
+els.promptScope.querySelectorAll("[data-scope]").forEach((b) => b.addEventListener("click", () => setScope(b.dataset.scope)));
+
 els.promptText.addEventListener("input", () => {
   updateCounter();
+  updatePreview();
   setStatus(els.promptStatus, els.promptText.value !== (state.prompt?.instructions || "") ? "Alterações não salvas." : "");
 });
 
@@ -552,10 +475,15 @@ $("#prompt-examples").addEventListener("click", (e) => {
   els.promptText.focus();
 });
 
+function targetsPayload() {
+  if (state.scope === "all") return "all";
+  return [...els.promptTargets.querySelectorAll("input:checked")].map((i) => i.value);
+}
+
 async function savePrompt(instructions) {
   els.promptSave.disabled = true;
   try {
-    renderPrompt(await api("instructions", "PUT", { instructions }));
+    renderPrompt(await api("instructions", "PUT", { instructions, targets: targetsPayload() }));
     renderOverview();
     setStatus(
       els.promptStatus,

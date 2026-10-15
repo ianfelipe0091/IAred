@@ -130,6 +130,24 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
 .advanced summary { width: fit-content; cursor: pointer; font-size: 13px; color: var(--text-2); }
 .advanced[open] summary { margin-bottom: 14px; }
 
+/* ---------- Lista de modelos ---------- */
+.model-list { display: grid; gap: 10px; }
+.model-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--border-strong); background: var(--bg); }
+.model-mark { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px; background: var(--aurora); color: #fff; }
+.model-mark svg { width: 17px; height: 17px; }
+.model-info { flex: 1; min-width: 0; }
+.model-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.model-sub { margin-top: 2px; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.model-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.model-actions .icon-btn { width: 32px; height: 32px; color: var(--muted); }
+.model-actions .icon-btn:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+
+/* ---------- Alvos das instruções e preview ---------- */
+.targets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.check { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--bg); font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--a2); }
+.preview { margin: 12px 0 0; max-height: 320px; overflow: auto; padding: 14px; border-radius: 10px; background: var(--code-bg); color: var(--code-text); font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 13px; color: var(--text-2); }
 .note > span svg { width: 16px; height: 16px; margin-top: 1px; color: var(--muted); }
 .note p { margin: 0; line-height: 1.5; }

@@ -73,7 +73,7 @@
         <span class="sb-settings-icon" data-icon="sparkle"></span>
         <span class="sb-text sb-settings-text">
           <span>Configurações</span>
-          <small><i class="dot" id="engine-dot"></i><span id="engine-sub">KIRA Free</span></small>
+          <small><i class="dot" id="engine-dot"></i><span id="engine-sub">KIRA</span></small>
         </span>
       </button>
     </aside>
@@ -104,7 +104,7 @@
           <textarea id="input" rows="1" placeholder="Pergunte qualquer coisa sobre segurança…" aria-label="Mensagem"></textarea>
           <div class="composer-bar">
             <button type="button" class="model-chip" id="engine-btn" title="Modelo de IA">
-              <span data-icon="sparkle"></span><span id="engine-label">KIRA Free</span><span data-icon="chevron"></span>
+              <span data-icon="sparkle"></span><span id="engine-label">KIRA</span><span data-icon="chevron"></span>
             </button>
             <button type="submit" class="send" id="send" aria-label="Enviar"></button>
           </div>
@@ -124,9 +124,11 @@
       </header>
 
       <div class="modal-body">
-        <p class="field-label">Modelo de IA</p>
-        <div class="plans" id="model-plans" role="radiogroup" aria-label="Modelo de IA"></div>
-        <p class="hint">A escolha vale para as próximas mensagens. O histórico fica salvo só neste navegador.</p>
+        <div id="model-section">
+          <p class="field-label">Modelo de IA</p>
+          <div class="plans" id="model-plans" role="radiogroup" aria-label="Modelo de IA"></div>
+          <p class="hint">A escolha vale para as próximas mensagens. O histórico fica salvo só neste navegador.</p>
+        </div>
 
         <div id="account" hidden>
           <p class="field-label">Conta</p>

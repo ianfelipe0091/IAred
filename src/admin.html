@@ -68,8 +68,7 @@
       <nav class="nav-list">
         <a class="nav-item" href="#visao-geral" data-nav="visao-geral"><span data-icon="grid"></span>Visão geral</a>
         <p class="nav-group">Inteligência artificial</p>
-        <a class="nav-item" href="#ia" data-nav="ia"><span data-icon="sparkle"></span>IA principal<i class="nav-dot" id="dot-ia"></i></a>
-        <a class="nav-item" href="#gratuita" data-nav="gratuita"><span data-icon="bolt"></span>KIRA Free<i class="nav-dot" id="dot-gratuita"></i></a>
+        <a class="nav-item" href="#modelos" data-nav="modelos"><span data-icon="sparkle"></span>Modelos<i class="nav-dot" id="dot-modelos"></i></a>
         <a class="nav-item" href="#instrucoes" data-nav="instrucoes"><span data-icon="doc"></span>Instruções<i class="nav-dot" id="dot-instrucoes"></i></a>
         <p class="nav-group">Acesso</p>
         <a class="nav-item" href="#usuarios" data-nav="usuarios"><span data-icon="users"></span>Login dos usuários<i class="nav-dot" id="dot-usuarios"></i></a>
@@ -97,23 +96,21 @@
           <div class="stats" id="stats"></div>
         </section>
 
-        <!-- IA principal -->
-        <section class="page" data-page="ia" hidden>
-          <div class="panel-card" id="status-card">
+        <!-- Modelos -->
+        <section class="page" data-page="modelos" hidden>
+          <div class="panel-card">
             <div class="panel-card-head">
-              <h2>Em uso</h2>
-              <p>O modelo que os usuários recebem como padrão.</p>
+              <h2>Modelos conectados</h2>
+              <p>Os usuários escolhem entre estes modelos no app. O marcado como padrão aparece primeiro.</p>
             </div>
-            <div class="panel-card-body" id="status"></div>
-            <footer class="panel-card-foot" id="status-foot" hidden>
-              <span class="foot-spacer"></span>
-              <button type="button" class="btn ghost danger small" id="remove">Remover configuração</button>
-            </footer>
+            <div class="panel-card-body">
+              <div class="model-list" id="model-list"></div>
+            </div>
           </div>
 
-          <form class="panel-card" id="config-form" autocomplete="off">
+          <form class="panel-card" id="model-form" autocomplete="off">
             <div class="panel-card-head">
-              <h2>Conexão</h2>
+              <h2>Adicionar modelo</h2>
               <p>Cole a URL da API e o token. O KIRA reconhece o provedor sozinho.</p>
             </div>
             <div class="panel-card-body">
@@ -137,7 +134,7 @@
                   <input id="token" class="input mono" type="password" placeholder="sk-…" spellcheck="false" autocapitalize="off" autocomplete="off" />
                   <button type="button" class="icon-btn" id="toggle-token" aria-label="Mostrar token" data-icon="eye"></button>
                 </div>
-                <p class="help" id="token-hint">Fica guardado só no servidor e nunca é mostrado aos usuários.</p>
+                <p class="help">Fica guardado só no servidor e nunca é mostrado aos usuários.</p>
               </div>
 
               <div class="inline-actions">
@@ -171,53 +168,8 @@
               </details>
             </div>
             <footer class="panel-card-foot">
-              <p class="key-status" id="config-status"></p>
-              <button type="submit" class="btn primary" id="save">Testar e salvar</button>
-            </footer>
-          </form>
-        </section>
-
-        <!-- KIRA Free -->
-        <section class="page" data-page="gratuita" hidden>
-          <form class="panel-card" id="free-form" autocomplete="off">
-            <div class="panel-card-head">
-              <h2>Origem do modelo gratuito</h2>
-              <p>O que os usuários usam ao escolher "KIRA Free".</p>
-            </div>
-            <div class="panel-card-body">
-              <div class="current" id="free-state"></div>
-
-              <div class="seg" role="radiogroup" aria-label="Origem da opção gratuita">
-                <button type="button" role="radio" data-source="cloudflare">Cloudflare Workers AI</button>
-                <button type="button" role="radio" data-source="openrouter">OpenRouter</button>
-              </div>
-
-              <p class="help" id="free-cf-help">Nemotron 3 Super 120B, incluído na conta da Cloudflare: 10.000 neurons grátis por dia (cerca de 30 a 50 mensagens).</p>
-
-              <div class="form-stack" id="free-or" hidden>
-                <div class="field">
-                  <label for="free-token">Chave da API da OpenRouter</label>
-                  <input id="free-token" class="input mono" type="password" placeholder="sk-or-v1-…" spellcheck="false" autocapitalize="off" autocomplete="off" />
-                  <p class="help">Crie em <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/settings/keys ↗</a>. Fica guardada só no servidor.</p>
-                </div>
-                <div class="inline-actions">
-                  <button type="button" class="btn ghost small" id="free-list">Carregar modelos</button>
-                  <span class="detected" id="free-detected"></span>
-                </div>
-                <div class="field">
-                  <label for="free-model">Modelo</label>
-                  <input id="free-model" class="input mono" type="text" list="free-models" placeholder="nvidia/nemotron-3-super-120b-a12b:free" spellcheck="false" autocapitalize="off" />
-                  <datalist id="free-models"></datalist>
-                </div>
-                <div class="note">
-                  <span data-icon="info"></span>
-                  <p>Modelos terminados em <b>:free</b> não custam nada: 20 por minuto e 50 mensagens por dia na conta toda (1.000 por dia depois de comprar US$ 10 em créditos). Nesses modelos, a OpenRouter e o provedor podem guardar os textos enviados.</p>
-                </div>
-              </div>
-            </div>
-            <footer class="panel-card-foot">
-              <p class="key-status" id="free-status"></p>
-              <button type="submit" class="btn primary" id="free-save">Salvar</button>
+              <p class="key-status" id="model-status"></p>
+              <button type="submit" class="btn primary" id="model-add">Testar e adicionar</button>
             </footer>
           </form>
         </section>
@@ -227,9 +179,17 @@
           <form class="panel-card" id="prompt-form" autocomplete="off">
             <div class="panel-card-head">
               <h2>Instruções para o modelo</h2>
-              <p>Enviadas em todas as conversas, nas duas opções de IA. Use para definir tom, público, formato das respostas ou informações do seu negócio.</p>
+              <p>Enviadas nas conversas para personalizar o comportamento: tom, público, formato das respostas ou informações do seu negócio.</p>
             </div>
             <div class="panel-card-body">
+              <div class="field">
+                <label>Aplicar a</label>
+                <div class="seg" id="prompt-scope" role="radiogroup" aria-label="Aplicar as instruções a">
+                  <button type="button" role="radio" data-scope="all">Todos os modelos</button>
+                  <button type="button" role="radio" data-scope="some">Modelos específicos</button>
+                </div>
+                <div class="targets" id="prompt-targets" hidden></div>
+              </div>
               <div class="field">
                 <div class="field-top">
                   <label for="prompt-text">Instruções</label>
@@ -246,8 +206,12 @@
               </div>
               <div class="note">
                 <span data-icon="info"></span>
-                <p>As instruções entram depois do prompt padrão da KIRA. As regras de uso responsável do prompt padrão continuam valendo, e o modelo segue as suas instruções desde que não as contrariem.</p>
+                <p>A sua instrução tem prioridade sobre o estilo padrão da KIRA. A única parte que ela não sobrepõe são as regras de uso responsável (não ajudar em ataque sem autorização, malware, roubo de dados).</p>
               </div>
+              <details class="advanced" id="preview-box">
+                <summary>Ver o que é enviado ao modelo</summary>
+                <pre class="preview" id="prompt-preview"></pre>
+              </details>
             </div>
             <footer class="panel-card-foot">
               <p class="key-status" id="prompt-status"></p>
