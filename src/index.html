@@ -125,12 +125,8 @@
 
       <div class="modal-body">
         <p class="field-label">Modelo de IA</p>
-        <div class="plan active">
-          <span class="plan-icon plan-icon-ai" data-icon="sparkle"></span>
-          <span class="plan-text"><b id="model-name">KIRA Free</b><small>Definido pelo administrador</small></span>
-          <span class="plan-check" data-icon="check"></span>
-        </div>
-        <p class="hint">Todas as conversas usam o modelo de IA escolhido pelo administrador. O histórico fica salvo só neste navegador.</p>
+        <div class="plans" id="model-plans" role="radiogroup" aria-label="Modelo de IA"></div>
+        <p class="hint">A escolha vale para as próximas mensagens. O histórico fica salvo só neste navegador.</p>
 
         <div id="account" hidden>
           <p class="field-label">Conta</p>

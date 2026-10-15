@@ -26,18 +26,26 @@ const LEGACY_CLAUDE = {
   options: { thinking: true, effort: "high", cache: true, fallbacks: true },
 };
 
-// Modelo que os usuários vão usar: o configurado no painel, a chave padrão antiga ou o gratuito.
-export async function resolveEngine(env) {
+// Modelos que o usuário pode escolher: a IA do painel (ou a chave padrão antiga) e o gratuito do Cloudflare.
+export async function availableEngines(env) {
   const config = (await loadAIConfig(env)) || (env.ANTHROPIC_API_KEY ? { ...LEGACY_CLAUDE, apiKey: env.ANTHROPIC_API_KEY } : null);
-  if (config) return engineFromConfig(config);
+  const engines = config ? [engineFromConfig(config)] : [];
   if (env.AI) {
-    return {
+    engines.push({
       ...FREE,
       stream: (args) => streamWorkersAI(env, args),
       describeError: describeWorkersAIError,
-    };
+    });
   }
-  return null;
+  return engines;
+}
+
+// Modelo da conversa: o gratuito se o usuário escolheu, senão a IA do painel.
+export async function resolveEngine(env, choice) {
+  const engines = await availableEngines(env);
+  const free = engines.find((e) => e.id === FREE.id);
+  const main = engines.find((e) => e.id !== FREE.id);
+  return (choice === FREE.id ? free || main : main || free) || null;
 }
 
 export function engineFromConfig(config) {

@@ -19,7 +19,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   // Modelo definido pelo administrador no painel (ou o gratuito, se não houver).
-  const engine = await resolveEngine(env);
+  const engine = await resolveEngine(env, body.model);
   if (!engine) {
     return json({ error: "Nenhum modelo de IA disponível. O administrador precisa configurar a IA no painel." }, 503);
   }

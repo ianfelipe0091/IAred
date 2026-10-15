@@ -1,8 +1,12 @@
 import { json } from "../_lib/http.js";
-import { FREE, resolveEngine } from "../_lib/providers.js";
+import { FREE, availableEngines } from "../_lib/providers.js";
 
-// GET: informa aos usuários qual modelo de IA está ativo.
+// GET: modelos que os usuários podem escolher (o primeiro é o padrão).
 export async function onRequestGet({ env }) {
-  const engine = await resolveEngine(env);
-  return json({ label: engine?.label || FREE.label, free: !engine || engine.id === FREE.id });
+  const models = (await availableEngines(env)).map((e) => ({
+    id: e.id === FREE.id ? FREE.id : "main",
+    label: e.label,
+    free: e.id === FREE.id,
+  }));
+  return json({ models });
 }

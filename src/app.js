@@ -21,7 +21,7 @@ const els = {
   engineSub: $("#engine-sub"),
   engineDot: $("#engine-dot"),
   settings: $("#settings"),
-  modelName: $("#model-name"),
+  modelPlans: $("#model-plans"),
   toasts: $("#toasts"),
   auth: $("#auth"),
   authForm: $("#auth-form"),
@@ -46,7 +46,8 @@ const STARTERS = [
 const state = {
   chatId: null,
   streaming: null, // { controller, chatId, msgId }
-  model: { label: "KIRA Free", free: true },
+  models: [{ id: "free", label: "KIRA Free", free: true }],
+  choice: store.getPref("model") || "main",
   user: null,
   authMode: "login",
 };
@@ -85,26 +86,46 @@ function persist() {
 
 // ---------------- Modelo ativo ----------------
 
+// Modelo escolhido pelo usuário; se não estiver disponível, usa o primeiro (a IA do painel).
+const currentModel = () => state.models.find((m) => m.id === state.choice) || state.models[0];
+
 function renderEngine() {
-  const { label, free } = state.model;
+  const { label, free } = currentModel();
   els.engineLabel.textContent = label;
   els.engineSub.textContent = label;
-  els.modelName.textContent = label;
   els.engineDot.classList.toggle("on", !free);
+  const active = currentModel().id;
+  els.modelPlans.innerHTML = state.models
+    .map(
+      (m) => `<button type="button" class="plan ${m.id === active ? "active" : ""}" data-model="${escapeHtml(m.id)}" role="radio" aria-checked="${m.id === active}">
+        <span class="plan-icon ${m.free ? "" : "plan-icon-ai"}">${icon(m.free ? "bolt" : "sparkle")}</span>
+        <span class="plan-text"><b>${escapeHtml(m.label)}</b><small>${m.free ? "Gratuito · Cloudflare Workers AI" : "Mais inteligente · definido pelo administrador"}</small></span>
+        <span class="plan-check">${icon("check")}</span>
+      </button>`,
+    )
+    .join("");
 }
 
 async function loadEngine() {
   try {
     const res = await fetch("/api/model");
     if (res.ok) {
-      const data = await res.json();
-      state.model = { label: data.label || state.model.label, free: data.free !== false };
+      const { models } = await res.json();
+      if (models?.length) state.models = models;
     }
   } catch {
-    // mantém o rótulo padrão
+    // mantém a lista padrão
   }
   renderEngine();
 }
+
+els.modelPlans.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-model]");
+  if (!b) return;
+  state.choice = b.dataset.model;
+  store.setPref("model", state.choice);
+  renderEngine();
+});
 
 // ---------------- Barra lateral ----------------
 
@@ -367,7 +388,7 @@ async function sendMessage(text) {
 
 async function runAssistant(chat) {
   const msg = { id: uid(), role: "assistant", content: "", thinking: "", notices: [], createdAt: Date.now() };
-  const payload = { messages: chat.messages.map(({ role, content }) => ({ role, content })) };
+  const payload = { model: currentModel().id, messages: chat.messages.map(({ role, content }) => ({ role, content })) };
   const controller = new AbortController();
   state.streaming = { controller, chatId: chat.id, msgId: msg.id };
   chat.messages.push(msg);
@@ -430,8 +451,6 @@ async function runAssistant(chat) {
         }
         if (ev.type === "meta") {
           msg.modelLabel = ev.label;
-          state.model = { label: ev.label, free: ev.model === "free" };
-          renderEngine();
         } else if (ev.type === "thinking") {
           if (!thinkStart) thinkStart = Date.now();
           msg.thinking += ev.text;
@@ -552,7 +571,7 @@ els.toBottom.addEventListener("click", () => {
 // ---------------- Configurações ----------------
 
 function openSettings() {
-  renderEngine();
+  loadEngine();
   renderAccount();
   els.settings.showModal();
   closeDrawer();
