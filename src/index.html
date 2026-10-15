@@ -16,7 +16,40 @@
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
-<body>
+<body class="booting">
+  <!-- Cadastro e login -->
+  <div class="auth" id="auth" hidden>
+    <form class="auth-card" id="auth-form" novalidate>
+      <img class="logo auth-logo" src="/favicon.svg?v=3" alt="" width="44" height="44" />
+      <h1 id="auth-title">Entrar no KIRA</h1>
+      <p class="auth-sub">Sua IA especialista em cibersegurança.</p>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" role="tab" data-mode="login" class="active" aria-selected="true">Entrar</button>
+        <button type="button" role="tab" data-mode="signup" aria-selected="false">Criar conta</button>
+      </div>
+      <div id="auth-name-wrap" hidden>
+        <label class="field-label" for="auth-name">Nome</label>
+        <div class="key-field">
+          <span data-icon="user"></span>
+          <input id="auth-name" class="plain" type="text" autocomplete="name" maxlength="80" />
+        </div>
+      </div>
+      <label class="field-label" for="auth-email">Email</label>
+      <div class="key-field">
+        <span data-icon="mail"></span>
+        <input id="auth-email" class="plain" type="email" autocomplete="email" autocapitalize="off" spellcheck="false" required />
+      </div>
+      <label class="field-label" for="auth-password">Senha</label>
+      <div class="key-field">
+        <span data-icon="lock"></span>
+        <input id="auth-password" class="plain" type="password" autocomplete="current-password" minlength="8" required />
+        <button type="button" class="icon-btn" id="auth-toggle" aria-label="Mostrar senha" data-icon="eye"></button>
+      </div>
+      <p class="key-status" id="auth-status"></p>
+      <button type="submit" class="btn primary wide" id="auth-submit">Entrar</button>
+    </form>
+  </div>
+
   <div class="app is-empty" id="app">
     <!-- Barra lateral -->
     <aside class="sidebar" id="sidebar" aria-label="Conversas">
@@ -98,6 +131,15 @@
           <span class="plan-check" data-icon="check"></span>
         </div>
         <p class="hint">Todas as conversas usam o modelo de IA escolhido pelo administrador. O histórico fica salvo só neste navegador.</p>
+
+        <div id="account" hidden>
+          <p class="field-label">Conta</p>
+          <div class="plan">
+            <span class="plan-icon" data-icon="user"></span>
+            <span class="plan-text"><b id="account-email"></b><small id="account-name">Conectado</small></span>
+            <button type="button" class="btn ghost small" id="sign-out">Sair</button>
+          </div>
+        </div>
       </div>
 
       <footer class="modal-foot">

@@ -423,6 +423,21 @@ svg { width: 18px; height: 18px; flex: none; display: block; }
 .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
 
 /* ---------- Toasts ---------- */
+.btn.wide { width: 100%; height: 44px; margin-top: 18px; }
+.key-field input.plain { font: 14px var(--font); }
+
+/* ---------- Cadastro e login ---------- */
+.booting .app { visibility: hidden; }
+.auth { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px 16px; overflow-y: auto; background: var(--halo), var(--bg); }
+.auth-card { width: min(400px, 100%); padding: 28px 24px 24px; border-radius: 22px; border: 1px solid var(--border-strong); background: var(--surface); box-shadow: var(--shadow); animation: rise .3s var(--ease) both; }
+.auth-logo { width: 44px; height: 44px; margin: 0 auto 14px; border-radius: 13px; }
+.auth-card h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; text-align: center; }
+.auth-sub { margin: 4px 0 18px; font-size: 14px; color: var(--text-2); text-align: center; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-2); }
+.auth-tabs button { height: 34px; border-radius: 9px; font-size: 14px; font-weight: 500; color: var(--text-2); transition: background .15s, color .15s; }
+.auth-tabs button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+.auth .key-status { line-height: 1.45; }
+
 .toasts { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 100; display: grid; gap: 8px; pointer-events: none; }
 .toast { padding: 10px 16px; border-radius: 999px; background: var(--btn); color: var(--btn-ink); font-size: 14px; font-weight: 500; box-shadow: var(--shadow); animation: rise .3s var(--ease) both; transition: opacity .3s; }
 .toast.error { background: var(--danger); color: #fff; }

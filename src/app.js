@@ -1,3 +1,4 @@
+import { apiHeaders, authClient, currentUser, describeAuthError, initAuth } from "./auth.js";
 import { hydrateIcons, icon } from "./icons.js";
 import { escapeHtml, renderMarkdown } from "./markdown.js";
 import { store, uid } from "./store.js";
@@ -22,6 +23,15 @@ const els = {
   settings: $("#settings"),
   modelName: $("#model-name"),
   toasts: $("#toasts"),
+  auth: $("#auth"),
+  authForm: $("#auth-form"),
+  authTitle: $("#auth-title"),
+  authName: $("#auth-name"),
+  authEmail: $("#auth-email"),
+  authPassword: $("#auth-password"),
+  authStatus: $("#auth-status"),
+  authSubmit: $("#auth-submit"),
+  account: $("#account"),
 };
 
 const MOBILE = matchMedia("(max-width: 820px)");
@@ -37,6 +47,8 @@ const state = {
   chatId: null,
   streaming: null, // { controller, chatId, msgId }
   model: { label: "KIRA Free", free: true },
+  user: null,
+  authMode: "login",
 };
 
 // ---------------- Utilidades ----------------
@@ -64,7 +76,6 @@ function copyText(text) {
 const currentChat = () => (state.chatId ? store.getChat(state.chatId) : null);
 const orb = (extra = "") => `<div class="orb ${extra}" aria-hidden="true"><span></span></div>`;
 
-const JSON_HEADERS = { "content-type": "application/json" };
 
 function persist() {
   const result = store.saveChats();
@@ -383,17 +394,20 @@ async function runAssistant(chat) {
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
-      headers: JSON_HEADERS,
+      headers: await apiHeaders(),
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
     if (!res.ok) {
       let err = `Erro HTTP ${res.status}`;
+      let data = {};
       try {
-        err = (await res.json()).error || err;
+        data = await res.json();
+        err = data.error || err;
       } catch {
         // resposta sem JSON
       }
+      if (res.status === 401 && data.auth) showAuth("Sua sessão expirou. Entre de novo para continuar.");
       throw new Error(err);
     }
     const reader = res.body.getReader();
@@ -449,7 +463,7 @@ async function generateTitle(chat, text) {
   if (state.chatId === chat.id) els.chatTitle.textContent = chat.title;
   renderHistory();
   try {
-    const res = await fetch("/api/title", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ text }) });
+    const res = await fetch("/api/title", { method: "POST", headers: await apiHeaders(), body: JSON.stringify({ text }) });
     const { title } = await res.json();
     if (title) {
       chat.title = title;
@@ -539,6 +553,7 @@ els.toBottom.addEventListener("click", () => {
 
 function openSettings() {
   renderEngine();
+  renderAccount();
   els.settings.showModal();
   closeDrawer();
 }
@@ -557,6 +572,115 @@ $("#clear-all").addEventListener("click", () => {
 
 els.settings.addEventListener("click", (e) => {
   if (e.target === els.settings || e.target.closest("[data-close]")) els.settings.close();
+});
+
+// ---------------- Cadastro e login ----------------
+
+function setAuthStatus(text, kind = "") {
+  els.authStatus.textContent = text;
+  els.authStatus.className = `key-status ${kind}`;
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  const signup = mode === "signup";
+  els.auth.querySelectorAll("[data-mode]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === mode);
+    b.setAttribute("aria-selected", String(b.dataset.mode === mode));
+  });
+  $("#auth-name-wrap").hidden = !signup;
+  els.authTitle.textContent = signup ? "Criar conta no KIRA" : "Entrar no KIRA";
+  els.authSubmit.textContent = signup ? "Criar conta" : "Entrar";
+  els.authPassword.autocomplete = signup ? "new-password" : "current-password";
+  setAuthStatus(signup ? "A senha precisa ter pelo menos 8 caracteres." : "");
+}
+
+function showAuth(message = "") {
+  if (!authClient()) {
+    toast("Não foi possível carregar o login. Recarregue a página.", "error");
+    return;
+  }
+  state.streaming?.controller.abort();
+  els.settings.open && els.settings.close();
+  document.body.classList.add("booting");
+  els.auth.hidden = false;
+  if (message) setAuthStatus(message, "error");
+  (els.authEmail.value ? els.authPassword : els.authEmail).focus();
+}
+
+function renderAccount() {
+  const user = state.user;
+  els.account.hidden = !user;
+  if (!user) return;
+  $("#account-email").textContent = user.email || "";
+  $("#account-name").textContent = user.user_metadata?.name || "Conectado";
+}
+
+// Abre o app para a conta atual (ou sem conta, quando o login está desligado).
+function enterApp(user) {
+  state.user = user;
+  store.useAccount(user?.id ?? null);
+  els.auth.hidden = true;
+  document.body.classList.remove("booting");
+  const fromHash = location.hash.slice(1);
+  if (fromHash && store.getChat(fromHash)?.messages.length) openChat(fromHash);
+  else newChat();
+}
+
+els.auth.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setAuthMode(b.dataset.mode)));
+
+$("#auth-toggle").addEventListener("click", (e) => {
+  const reveal = els.authPassword.type === "password";
+  els.authPassword.type = reveal ? "text" : "password";
+  e.currentTarget.innerHTML = icon(reveal ? "eye-off" : "eye");
+  e.currentTarget.setAttribute("aria-label", reveal ? "Esconder senha" : "Mostrar senha");
+});
+
+els.authForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const client = authClient();
+  const email = els.authEmail.value.trim();
+  const password = els.authPassword.value;
+  const signup = state.authMode === "signup";
+  if (!email || !password) return setAuthStatus("Preencha o email e a senha.", "error");
+  if (signup && password.length < 8) return setAuthStatus("A senha precisa ter pelo menos 8 caracteres.", "error");
+
+  els.authSubmit.disabled = true;
+  setAuthStatus(signup ? "Criando a sua conta…" : "Entrando…");
+  try {
+    const { data, error } = signup
+      ? await client.auth.signUp({
+          email,
+          password,
+          options: { data: { name: els.authName.value.trim() }, emailRedirectTo: location.origin },
+        })
+      : await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (!data.session) {
+      setAuthMode("login");
+      setAuthStatus("Conta criada! Confirme o seu email pelo link que enviamos e depois entre aqui.", "ok");
+      return;
+    }
+    els.authPassword.value = "";
+    enterApp(data.session.user);
+    if (signup) toast("Conta criada. Bem-vindo ao KIRA!");
+  } catch (err) {
+    setAuthStatus(describeAuthError(err), "error");
+  } finally {
+    els.authSubmit.disabled = false;
+  }
+});
+
+$("#sign-out").addEventListener("click", async () => {
+  state.streaming?.controller.abort();
+  els.settings.close();
+  await authClient()?.auth.signOut();
+  state.user = null;
+  store.chats = [];
+  els.messages.innerHTML = "";
+  renderHistory();
+  setAuthMode("login");
+  showAuth();
 });
 
 // ---------------- Atalhos ----------------
@@ -580,6 +704,12 @@ if (store.getPref("collapsed") && !MOBILE.matches) els.app.classList.add("collap
 setBusy(false);
 renderEngine();
 loadEngine();
-const fromHash = location.hash.slice(1);
-if (fromHash && store.getChat(fromHash)?.messages.length) openChat(fromHash);
-else newChat();
+
+(async () => {
+  const client = await initAuth();
+  if (!client) return enterApp(null);
+  const user = await currentUser();
+  if (user) return enterApp(user);
+  setAuthMode("login");
+  showAuth();
+})();

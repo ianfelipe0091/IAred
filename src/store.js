@@ -1,5 +1,6 @@
 // Persistência local (apenas neste navegador).
 const KEY_CHATS = "iahack:chats";
+let chatsKey = KEY_CHATS;
 
 // A chave da API agora é definida só pelo administrador: apaga a que o usuário tinha colado.
 try {
@@ -30,15 +31,32 @@ export const uid = () =>
   crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 export const store = {
-  chats: read(KEY_CHATS, []),
+  chats: [],
+
+  // Cada conta tem o próprio histórico neste navegador; sem login, usa o histórico geral.
+  // A primeira conta a entrar herda as conversas feitas antes do login existir.
+  useAccount(userId) {
+    chatsKey = userId ? `${KEY_CHATS}:${userId}` : KEY_CHATS;
+    if (userId && read(chatsKey, null) === null) {
+      const legacy = read(KEY_CHATS, null);
+      if (legacy?.length && write(chatsKey, legacy)) {
+        try {
+          localStorage.removeItem(KEY_CHATS);
+        } catch {
+          // ignora
+        }
+      }
+    }
+    this.chats = read(chatsKey, []);
+  },
 
   saveChats() {
-    if (write(KEY_CHATS, this.chats)) return true;
+    if (write(chatsKey, this.chats)) return true;
     // Armazenamento cheio: descarta as conversas mais antigas até caber.
     const sorted = [...this.chats].sort((a, b) => a.updatedAt - b.updatedAt);
     for (const chat of sorted) {
       this.chats = this.chats.filter((c) => c.id !== chat.id);
-      if (write(KEY_CHATS, this.chats)) return "trimmed";
+      if (write(chatsKey, this.chats)) return "trimmed";
     }
     return false;
   },

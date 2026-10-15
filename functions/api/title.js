@@ -1,13 +1,11 @@
-const json = (data, status = 200) =>
-  new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
-  });
+import { requireUser } from "../_lib/auth.js";
+import { json } from "../_lib/http.js";
 
 const TITLE_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 // Gera um título curto para a conversa a partir da primeira mensagem.
 export async function onRequestPost({ request, env }) {
+  if (await requireUser(request, env)) return json({ title: null }, 401);
   if (!env.AI) return json({ title: null });
 
   let text = "";

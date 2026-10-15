@@ -25,6 +25,13 @@ const els = {
   remove: $("#remove"),
   save: $("#save"),
   toasts: $("#toasts"),
+  sbForm: $("#sb-form"),
+  sbState: $("#sb-state"),
+  sbUrl: $("#sb-url"),
+  sbKey: $("#sb-key"),
+  sbStatus: $("#sb-status"),
+  sbSave: $("#sb-save"),
+  sbRemove: $("#sb-remove"),
 };
 
 const FORMAT_LABEL = { anthropic: "API da Anthropic", openai: "compatível com OpenAI" };
@@ -185,7 +192,55 @@ async function showPanel() {
   }
   renderStatus();
   fillForm();
+  loadUserAuth();
 }
+
+// ---------------- Login dos usuários (Supabase) ----------------
+
+function renderUserAuth(auth) {
+  els.sbState.innerHTML = auth.enabled
+    ? `<i class="dot on"></i>Login ativo: só usuários cadastrados usam o KIRA`
+    : `<i class="dot"></i>Login desligado: qualquer visitante usa o KIRA`;
+  els.sbUrl.value = auth.url || "";
+  els.sbKey.value = "";
+  els.sbKey.placeholder = auth.keyHint ? `Salva: ${auth.keyHint}` : "sb_publishable_… ou eyJ…";
+  els.sbRemove.hidden = !auth.enabled;
+}
+
+async function loadUserAuth() {
+  try {
+    renderUserAuth(await api("auth"));
+  } catch (err) {
+    setStatus(els.sbStatus, err.message, "error");
+  }
+}
+
+els.sbForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.sbSave.disabled = true;
+  setStatus(els.sbStatus, "Testando com a Supabase…");
+  try {
+    const auth = await api("auth", "PUT", { url: els.sbUrl.value.trim(), anonKey: els.sbKey.value.trim() });
+    renderUserAuth(auth);
+    const note = auth.signupEnabled === false ? " Atenção: novos cadastros estão desativados na Supabase." : "";
+    setStatus(els.sbStatus, `Login ativo. Os usuários já precisam entrar ou criar conta.${note}`, "ok");
+    toast("Login dos usuários ativado");
+  } catch (err) {
+    setStatus(els.sbStatus, err.message, "error");
+  } finally {
+    els.sbSave.disabled = false;
+  }
+});
+
+els.sbRemove.addEventListener("click", async () => {
+  if (!confirm("Desligar o login? Qualquer visitante volta a poder usar o KIRA sem conta.")) return;
+  try {
+    renderUserAuth(await api("auth", "DELETE"));
+    setStatus(els.sbStatus, "Login desligado.");
+  } catch (err) {
+    setStatus(els.sbStatus, err.message, "error");
+  }
+});
 
 function formData() {
   return {

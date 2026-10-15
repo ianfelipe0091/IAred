@@ -6,8 +6,16 @@ pages_build_output_dir = "./dist"
 [ai]
 binding = "AI"
 
-# Painel administrativo (/admin): precisa do KV "CONFIG" e dos secrets ADMIN_USER e ADMIN_PASSWORD.
-#   npx wrangler kv namespace create kira-config --binding CONFIG --update-config
+# Configuração do painel administrativo (IA e login dos usuários).
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "1871b0b2e1944dea88e70521653f77ab"
+
+[vars]
+# Projeto da Supabase usado no cadastro e login dos usuários (a chave pública é colada no painel).
+SUPABASE_URL = "https://vgypgqnkyxxpnghcbfmc.supabase.co"
+
+# Painel administrativo (/admin): usuário e senha nos secrets ADMIN_USER e ADMIN_PASSWORD.
 #   npx wrangler pages secret put ADMIN_USER --project-name kira
 #   npx wrangler pages secret put ADMIN_PASSWORD --project-name kira
 # Opcional: ANTHROPIC_API_KEY (secret) é usada enquanto o painel não tiver uma IA configurada.

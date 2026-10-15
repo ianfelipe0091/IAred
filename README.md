@@ -14,6 +14,8 @@ O administrador escolhe a IA que todos os usuários vão usar no **painel admini
 
 Os usuários não colam chave nenhuma: o token fica só no servidor (KV da Cloudflare) e nunca é enviado ao navegador.
 
+**Cadastro e login dos usuários** (Supabase Auth): quando o admin ativa no painel, só quem tem conta usa o KIRA. A tela inicial passa a ter "Entrar" e "Criar conta" (email e senha), o servidor confere o token de cada mensagem na Supabase e o histórico de conversas fica separado por conta no navegador.
+
 ## Recursos
 
 - Chat em streaming com Markdown, realce de sintaxe e botão de copiar código.
@@ -31,16 +33,18 @@ Os usuários não colam chave nenhuma: o token fica só no servidor (KV da Cloud
 functions/
   api/chat.js         POST /api/chat  → streaming SSE (Claude ou modelo gratuito)
   api/model.js        GET  /api/model → modelo ativo (para o app)
+  api/auth/config.js  GET  /api/auth/config → URL e chave pública da Supabase (para o login)
   api/title.js        POST /api/title → título automático
   api/admin/*         login, reconhecimento do provedor e configuração da IA
   _lib/prompt.js      prompt de sistema do especialista
   _lib/providers.js   integração com Anthropic, APIs compatíveis com OpenAI e Workers AI
   _lib/detect.js      reconhece o provedor pela URL/token e testa a conexão
-  _lib/admin-auth.js  senha do admin, sessão assinada e limite de tentativas
+  _lib/admin-auth.js  usuário/senha do admin, sessão assinada e limite de tentativas
+  _lib/auth.js        login dos usuários: configuração da Supabase e validação do token
 src/                  frontend (JS puro, empacotado com esbuild); admin.* é o painel
 public/               estáticos (ícones, manifest, _headers)
 build.mjs             gera dist/
-wrangler.toml         configuração do Pages (bindings AI e CONFIG)
+wrangler.toml         configuração do Pages (bindings AI e CONFIG, SUPABASE_URL)
 ```
 
 ## Desenvolvimento e deploy
@@ -77,7 +81,13 @@ Depois, abra `https://kira-cb0.pages.dev/admin`, entre com o usuário e a senha 
 3. **Reconhecer provedor** para listar os modelos, escolher o **modelo** e, se quiser, o nome que os usuários veem.
 4. **Testar e salvar**: o painel faz uma pergunta curta à IA e só salva se ela responder.
 
-A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagação do KV). Para voltar ao modelo gratuito, use **Remover configuração**.
+A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagação do KV).
+
+### Login dos usuários
+
+Na seção **Cadastro e login dos usuários** do painel, informe a URL do projeto (`https://<projeto>.supabase.co`) e a **chave pública** (publishable `sb_publishable_…` ou anon), que fica na Supabase em Project Settings → API Keys. O painel testa a chave na Supabase e recusa a chave secreta (`sb_secret_…`/`service_role`). **Desligar login** volta a deixar o app aberto.
+
+Na Supabase (Authentication → Sign In / Providers), a confirmação de email vem ligada. Sem um SMTP próprio, o email padrão da Supabase só chega a membros da equipe do projeto: para receber usuários de fora, configure um SMTP (Authentication → Emails → SMTP Settings) ou desligue "Confirm email". Para voltar ao modelo gratuito, use **Remover configuração**.
 
 Segurança do painel: sessão em cookie `HttpOnly`/`SameSite=Strict` assinado com HMAC (8 h), bloqueio por 15 min após 10 tentativas erradas, as rotas de escrita só aceitam requisições do próprio site e o token nunca é devolvido ao navegador (o painel mostra só os 4 últimos caracteres). Trocar o `ADMIN_USER` ou a `ADMIN_PASSWORD` encerra todas as sessões abertas. O usuário não diferencia maiúsculas de minúsculas; a senha, sim.
 

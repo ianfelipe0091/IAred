@@ -114,6 +114,32 @@
             <button type="submit" class="btn primary" id="save">Testar e salvar</button>
           </footer>
         </form>
+
+        <form class="card" id="sb-form" autocomplete="off">
+          <h2>Cadastro e login dos usuários</h2>
+          <p class="lead">Com o login ativo, só quem tem conta usa o KIRA. As contas ficam no seu projeto da Supabase.</p>
+          <div class="status-head sb-state" id="sb-state"></div>
+
+          <label class="field-label" for="sb-url">URL do projeto Supabase</label>
+          <div class="key-field">
+            <span data-icon="link"></span>
+            <input id="sb-url" type="text" inputmode="url" placeholder="https://xxxx.supabase.co" spellcheck="false" autocapitalize="off" />
+          </div>
+
+          <label class="field-label" for="sb-key">Chave pública (publishable ou anon)</label>
+          <div class="key-field">
+            <span data-icon="key"></span>
+            <input id="sb-key" type="text" placeholder="sb_publishable_… ou eyJ…" spellcheck="false" autocapitalize="off" />
+          </div>
+          <p class="hint">Na Supabase: Project Settings → API Keys. Use a chave pública, nunca a secreta (sb_secret_ ou service_role).</p>
+
+          <p class="key-status" id="sb-status"></p>
+          <footer class="form-foot">
+            <button type="button" class="link-danger" id="sb-remove" hidden>Desligar login</button>
+            <span class="foot-spacer"></span>
+            <button type="submit" class="btn primary" id="sb-save">Testar e ativar</button>
+          </footer>
+        </form>
       </div>
     </main>
   </div>

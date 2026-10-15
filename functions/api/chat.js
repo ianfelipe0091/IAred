@@ -1,3 +1,4 @@
+import { requireUser } from "../_lib/auth.js";
 import { json } from "../_lib/http.js";
 import { buildSystemPrompt } from "../_lib/prompt.js";
 import { resolveEngine } from "../_lib/providers.js";
@@ -7,6 +8,9 @@ const MAX_TOTAL_CHARS = 2_000_000;
 const CHARS_PER_TOKEN = 3.2;
 
 export async function onRequestPost({ request, env }) {
+  const denied = await requireUser(request, env);
+  if (denied) return denied;
+
   let body;
   try {
     body = await request.json();
