@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { loadAIConfig } from "./config.js";
+import { loadAIConfig, loadFreeConfig } from "./config.js";
 
 // Todos os provedores emitem os mesmos eventos para o frontend:
 //   { type: "thinking", text }   trecho do raciocínio
@@ -10,6 +10,7 @@ import { loadAIConfig } from "./config.js";
 export const FREE = {
   id: "free",
   label: "KIRA Free",
+  provider: "Cloudflare Workers AI",
   model: "@cf/nvidia/nemotron-3-120b-a12b",
   maxTokens: 16000,
   contextTokens: 200000,
@@ -26,11 +27,15 @@ const LEGACY_CLAUDE = {
   options: { thinking: true, effort: "high", cache: true, fallbacks: true },
 };
 
-// Modelos que o usuário pode escolher: a IA do painel (ou a chave padrão antiga) e o gratuito do Cloudflare.
+// Modelos que o usuário pode escolher: a IA do painel (ou a chave padrão antiga) e a opção gratuita,
+// que usa a OpenRouter quando o admin configurou e, senão, o Workers AI do Cloudflare.
 export async function availableEngines(env) {
-  const config = (await loadAIConfig(env)) || (env.ANTHROPIC_API_KEY ? { ...LEGACY_CLAUDE, apiKey: env.ANTHROPIC_API_KEY } : null);
-  const engines = config ? [engineFromConfig(config)] : [];
-  if (env.AI) {
+  const [config, freeConfig] = await Promise.all([loadAIConfig(env), loadFreeConfig(env)]);
+  const main = config || (env.ANTHROPIC_API_KEY ? { ...LEGACY_CLAUDE, apiKey: env.ANTHROPIC_API_KEY } : null);
+  const engines = main ? [engineFromConfig(main)] : [];
+  if (freeConfig) {
+    engines.push({ ...engineFromConfig(freeConfig), id: FREE.id, label: FREE.label, provider: freeConfig.provider });
+  } else if (env.AI) {
     engines.push({
       ...FREE,
       stream: (args) => streamWorkersAI(env, args),

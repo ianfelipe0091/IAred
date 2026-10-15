@@ -7,6 +7,8 @@ export class ConfigError extends Error {}
 
 const TIMEOUT_MS = 20_000;
 
+export const OPENROUTER_URL = "https://openrouter.ai/api/v1";
+
 // O host da URL (ou, sem URL, o prefixo do token) indica o provedor e o formato da API.
 // A ordem importa para os prefixos: "sk-" genérico (OpenAI) fica por último.
 const KNOWN = [
@@ -109,8 +111,27 @@ async function listOpenAIModels(target, token) {
   return list
     .filter((m) => m && typeof m.id === "string")
     .slice(0, 1000)
-    .map((m) => ({ id: m.id, name: m.name || m.id, context: m.context_length || m.context_window || null }))
+    .map((m) => ({
+      id: m.id,
+      name: m.name || m.id,
+      context: m.context_length || m.context_window || null,
+      // A OpenRouter informa o preço; modelos sem custo aparecem como gratuitos no painel.
+      ...(m.pricing && { free: Number(m.pricing.prompt) === 0 && Number(m.pricing.completion) === 0 }),
+    }))
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+// A lista de modelos da OpenRouter é pública e aceita qualquer chave; a rota /key é que confere a chave.
+async function verifyOpenRouterKey(target, token) {
+  const res = await fetch(`${target.baseURL}/key`, {
+    headers: { authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (res.status === 401 || res.status === 403) {
+    throw new ConfigError(`A OpenRouter recusou a chave da API (HTTP ${res.status}). Confira a chave.`);
+  }
+  const data = res.ok ? (await res.json().catch(() => ({})))?.data || {} : {};
+  return { freeTier: data.is_free_tier === true };
 }
 
 const statusOf = (err) => (err instanceof ProviderError || err instanceof Anthropic.APIError ? err.status : null);
@@ -125,8 +146,10 @@ export async function detectProvider({ url, token, format = "auto" }) {
   for (const target of tries) {
     try {
       const models = target.format === "anthropic" ? await listAnthropicModels(target, token) : await listOpenAIModels(target, token);
-      return { ...target, formatLabel: FORMAT_LABEL[target.format], models, suggested: suggestModel(target, models) };
+      const account = target.provider === "OpenRouter" ? await verifyOpenRouterKey(target, token) : {};
+      return { ...target, ...account, formatLabel: FORMAT_LABEL[target.format], models, suggested: suggestModel(target, models) };
     } catch (err) {
+      if (err instanceof ConfigError) throw err;
       failures.push({ target, err });
     }
   }

@@ -7,6 +7,7 @@ export async function onRequestGet({ env }) {
     id: e.id === FREE.id ? FREE.id : "main",
     label: e.label,
     free: e.id === FREE.id,
+    ...(e.id === FREE.id && { provider: e.provider }),
   }));
   return json({ models });
 }

@@ -25,6 +25,16 @@ const els = {
   remove: $("#remove"),
   save: $("#save"),
   toasts: $("#toasts"),
+  freeForm: $("#free-form"),
+  freeState: $("#free-state"),
+  freeOr: $("#free-or"),
+  freeToken: $("#free-token"),
+  freeList: $("#free-list"),
+  freeDetected: $("#free-detected"),
+  freeModel: $("#free-model"),
+  freeModels: $("#free-models"),
+  freeStatus: $("#free-status"),
+  freeSave: $("#free-save"),
   sbForm: $("#sb-form"),
   sbState: $("#sb-state"),
   sbUrl: $("#sb-url"),
@@ -39,6 +49,8 @@ const TOKEN_HINT = els.tokenHint.textContent;
 
 const state = {
   config: null, // configuração salva (sem o token)
+  free: null, // opção gratuita salva (sem o token)
+  freeSource: "cloudflare",
   names: new Map(), // id do modelo → nome amigável
 };
 
@@ -192,8 +204,101 @@ async function showPanel() {
   }
   renderStatus();
   fillForm();
+  loadFree();
   loadUserAuth();
 }
+
+// ---------------- Atalhos de provedor ----------------
+
+$("#presets").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-url]");
+  if (!b) return;
+  els.url.value = b.dataset.url;
+  els.format.value = "auto";
+  els.detected.textContent = "";
+  els.token.focus();
+});
+
+// ---------------- Opção gratuita (KIRA Free) ----------------
+
+function setFreeSource(source) {
+  state.freeSource = source;
+  els.freeForm.querySelectorAll("[data-source]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.source === source);
+    b.setAttribute("aria-checked", String(b.dataset.source === source));
+  });
+  els.freeOr.hidden = source !== "openrouter";
+}
+
+function renderFree(free) {
+  state.free = free;
+  const or = free.source === "openrouter";
+  els.freeState.innerHTML = or
+    ? `<i class="dot on"></i><span>Usando a OpenRouter: <b class="mono-inline">${esc(free.model)}</b></span>`
+    : `<i class="dot"></i><span>Usando o Cloudflare Workers AI (Nemotron 3 Super 120B)</span>`;
+  els.freeToken.value = "";
+  els.freeToken.placeholder = or && free.tokenHint ? `Salva: ${free.tokenHint}` : "sk-or-v1-…";
+  els.freeModel.value = or ? free.model : els.freeModel.value;
+  setFreeSource(free.source);
+}
+
+async function loadFree() {
+  try {
+    renderFree(await api("free"));
+  } catch (err) {
+    setStatus(els.freeStatus, err.message, "error");
+  }
+}
+
+els.freeForm.querySelectorAll("[data-source]").forEach((b) =>
+  b.addEventListener("click", () => {
+    setFreeSource(b.dataset.source);
+    setStatus(els.freeStatus, "");
+    if (b.dataset.source === "openrouter" && !els.freeModel.value) {
+      els.freeModel.value = "nvidia/nemotron-3-super-120b-a12b:free";
+    }
+  }),
+);
+
+els.freeList.addEventListener("click", async () => {
+  els.freeList.disabled = true;
+  els.freeDetected.className = "detected";
+  els.freeDetected.textContent = "Conferindo a chave…";
+  try {
+    const { models, freeTier } = await api("free", "POST", { token: els.freeToken.value.trim() });
+    els.freeModels.innerHTML = models
+      .map((m) => `<option value="${esc(m.id)}">${m.free ? "Grátis · " : ""}${esc(m.name)}</option>`)
+      .join("");
+    const free = models.filter((m) => m.free).length;
+    const account = freeTier ? " · conta sem créditos (50 mensagens/dia nos grátis)" : "";
+    els.freeDetected.innerHTML = `${icon("check")}<span>Chave válida · ${models.length} modelos, ${free} grátis${esc(account)}</span>`;
+  } catch (err) {
+    els.freeDetected.className = "detected error";
+    els.freeDetected.textContent = err.message;
+  } finally {
+    els.freeList.disabled = false;
+  }
+});
+
+els.freeForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.freeSave.disabled = true;
+  try {
+    if (state.freeSource === "cloudflare") {
+      renderFree(await api("free", "DELETE"));
+      setStatus(els.freeStatus, "A opção gratuita voltou a usar o Cloudflare Workers AI.", "ok");
+    } else {
+      setStatus(els.freeStatus, "Testando o modelo na OpenRouter… pode levar alguns segundos.");
+      renderFree(await api("free", "PUT", { token: els.freeToken.value.trim(), model: els.freeModel.value.trim() }));
+      setStatus(els.freeStatus, "Salvo. O KIRA Free agora usa a OpenRouter.", "ok");
+    }
+    toast("Opção gratuita salva");
+  } catch (err) {
+    setStatus(els.freeStatus, err.message, "error");
+  } finally {
+    els.freeSave.disabled = false;
+  }
+});
 
 // ---------------- Login dos usuários (Supabase) ----------------
 

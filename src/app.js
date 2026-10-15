@@ -106,7 +106,7 @@ function renderEngine() {
       .map(
         (m) => `<button type="button" class="plan" data-model="${escapeHtml(m.id)}" role="radio">
         <span class="plan-icon ${m.free ? "" : "plan-icon-ai"}">${icon(m.free ? "bolt" : "sparkle")}</span>
-        <span class="plan-text"><b>${escapeHtml(m.label)}</b><small>${m.free ? "Gratuito · Cloudflare Workers AI" : "Mais inteligente · definido pelo administrador"}</small></span>
+        <span class="plan-text"><b>${escapeHtml(m.label)}</b><small>${m.free ? `Gratuito · ${escapeHtml(m.provider || "Cloudflare Workers AI")}` : "Mais inteligente · definido pelo administrador"}</small></span>
         <span class="plan-check">${icon("check")}</span>
       </button>`,
       )

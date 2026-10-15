@@ -67,7 +67,15 @@
             <span data-icon="link"></span>
             <input id="url" type="text" inputmode="url" placeholder="https://api.openai.com/v1" spellcheck="false" autocapitalize="off" />
           </div>
-          <p class="hint">Exemplos: https://api.anthropic.com · https://api.openai.com/v1 · https://openrouter.ai/api/v1 · https://api.groq.com/openai/v1. Em branco, o KIRA tenta reconhecer pelo token.</p>
+          <div class="presets" id="presets">
+            <span>Atalhos:</span>
+            <button type="button" data-url="https://openrouter.ai/api/v1">OpenRouter</button>
+            <button type="button" data-url="https://api.anthropic.com">Anthropic</button>
+            <button type="button" data-url="https://api.openai.com/v1">OpenAI</button>
+            <button type="button" data-url="https://generativelanguage.googleapis.com/v1beta/openai">Gemini</button>
+            <button type="button" data-url="https://api.groq.com/openai/v1">Groq</button>
+          </div>
+          <p class="hint">Qualquer API no formato da Anthropic ou da OpenAI funciona. Em branco, o KIRA tenta reconhecer pelo token.</p>
 
           <label class="field-label" for="token">Token da IA</label>
           <div class="key-field">
@@ -112,6 +120,45 @@
             <button type="button" class="link-danger" id="remove" hidden>Remover configuração</button>
             <span class="foot-spacer"></span>
             <button type="submit" class="btn primary" id="save">Testar e salvar</button>
+          </footer>
+        </form>
+
+        <form class="card" id="free-form" autocomplete="off">
+          <h2>Opção gratuita (KIRA Free)</h2>
+          <p class="lead">O modelo que os usuários usam ao escolher "KIRA Free". Pode ser o do Cloudflare ou um modelo da OpenRouter, conectado com a sua chave de API.</p>
+          <div class="status-head sb-state" id="free-state"></div>
+
+          <div class="seg" role="radiogroup" aria-label="Origem da opção gratuita">
+            <button type="button" role="radio" data-source="cloudflare">Cloudflare Workers AI</button>
+            <button type="button" role="radio" data-source="openrouter">OpenRouter</button>
+          </div>
+
+          <div id="free-or" hidden>
+            <label class="field-label" for="free-token">Chave da API da OpenRouter</label>
+            <div class="key-field">
+              <span data-icon="key"></span>
+              <input id="free-token" type="password" placeholder="sk-or-v1-…" spellcheck="false" autocapitalize="off" autocomplete="off" />
+            </div>
+            <p class="hint">Crie a chave em <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/settings/keys ↗</a>. Ela fica só no servidor.</p>
+
+            <div class="detect-row">
+              <button type="button" class="btn ghost small" id="free-list">Carregar modelos</button>
+              <span class="detected" id="free-detected"></span>
+            </div>
+
+            <label class="field-label" for="free-model">Modelo</label>
+            <div class="key-field">
+              <span data-icon="chip"></span>
+              <input id="free-model" type="text" list="free-models" placeholder="nvidia/nemotron-3-super-120b-a12b:free" spellcheck="false" autocapitalize="off" />
+              <datalist id="free-models"></datalist>
+            </div>
+            <p class="hint">Modelos terminados em <b>:free</b> não custam nada: 20 por minuto e 50 mensagens por dia na conta toda (1.000 por dia depois de comprar US$ 10 em créditos). Nos modelos gratuitos, a OpenRouter e o provedor podem guardar os textos enviados.</p>
+          </div>
+
+          <p class="key-status" id="free-status"></p>
+          <footer class="form-foot">
+            <span class="foot-spacer"></span>
+            <button type="submit" class="btn primary" id="free-save">Salvar</button>
           </footer>
         </form>
 
