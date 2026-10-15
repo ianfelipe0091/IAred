@@ -14,6 +14,8 @@ const normalizeUser = (user) => String(user ?? "").trim().toLowerCase();
 
 export const userConfigured = (env) => normalizeUser(env.ADMIN_USER) !== "";
 
+export const adminName = (env) => normalizeUser(env.ADMIN_USER);
+
 export const passwordConfigured = (env) =>
   typeof env.ADMIN_PASSWORD === "string" && env.ADMIN_PASSWORD.length >= MIN_PASSWORD;
 

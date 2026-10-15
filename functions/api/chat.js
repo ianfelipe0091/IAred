@@ -1,4 +1,5 @@
 import { requireUser } from "../_lib/auth.js";
+import { loadPromptConfig } from "../_lib/config.js";
 import { json } from "../_lib/http.js";
 import { buildSystemPrompt } from "../_lib/prompt.js";
 import { resolveEngine } from "../_lib/providers.js";
@@ -33,7 +34,7 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Conversa grande demais. Inicie uma nova conversa." }, 413);
   }
 
-  const system = buildSystemPrompt();
+  const system = buildSystemPrompt((await loadPromptConfig(env))?.instructions);
   const { kept, dropped } = fitToContext(messages, engine, system);
   if (!kept.length) {
     return json({ error: "Sua mensagem é grande demais. Reduza o texto e tente de novo." }, 413);

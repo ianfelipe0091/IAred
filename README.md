@@ -83,6 +83,10 @@ Depois, abra `https://kira-cb0.pages.dev/admin`, entre com o usuário e a senha 
 
 A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagação do KV).
 
+### Instruções para o modelo
+
+Na página **Instruções** do painel, escreva o que o modelo deve seguir em todas as conversas (tom, público, formato, informações do seu negócio), até 8.000 caracteres. O texto entra no prompt de sistema depois do prompt padrão da KIRA, cujas regras de uso responsável continuam valendo; em branco, só o prompt padrão é usado.
+
 ### Opção gratuita (KIRA Free)
 
 Os usuários escolhem entre a IA principal e o **KIRA Free**. Por padrão, o KIRA Free usa o Nemotron 3 Super 120B do Cloudflare Workers AI (10.000 neurons grátis por dia na conta). No cartão **Opção gratuita** do painel dá para trocá-lo por um modelo da **OpenRouter**: cole a chave da API (openrouter.ai/settings/keys), clique em **Carregar modelos** (os gratuitos, terminados em `:free`, aparecem primeiro) e salve. O painel confere a chave e testa o modelo antes de salvar. A IA principal também aceita a OpenRouter (`https://openrouter.ai/api/v1`, há um atalho no painel).

@@ -1,6 +1,7 @@
 // Configurações definidas no painel administrativo, guardadas no KV "CONFIG":
 //   "ai"   IA principal  { provider, format, baseURL, apiKey, model, label, contextTokens, maxOutput, options, updatedAt }
 //   "free" opção gratuita via OpenRouter (mesmo formato); sem ela, a gratuita é o Workers AI.
+//   "prompt" instruções extras do admin para o modelo { instructions, updatedAt }
 
 const CACHE_MS = 15_000;
 
@@ -27,6 +28,7 @@ function kvEntry(key) {
 
 const ai = kvEntry("ai");
 const free = kvEntry("free");
+const prompt = kvEntry("prompt");
 
 export const hasStorage = (env) => Boolean(env.CONFIG);
 
@@ -37,6 +39,10 @@ export const deleteAIConfig = ai.remove;
 export const loadFreeConfig = free.load;
 export const saveFreeConfig = free.save;
 export const deleteFreeConfig = free.remove;
+
+export const loadPromptConfig = prompt.load;
+export const savePromptConfig = prompt.save;
+export const deletePromptConfig = prompt.remove;
 
 // O que o painel pode ver: nunca devolve o token inteiro.
 export function publicView(config) {

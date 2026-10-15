@@ -1,5 +1,6 @@
 import {
   checkCredentials,
+  adminName,
   createSessionCookie,
   credentialsConfigured,
   recordFailure,
@@ -21,5 +22,5 @@ export async function onRequestPost({ request, env }) {
     await recordFailure(env, ip);
     return json({ error: "Usuário ou senha incorretos." }, 401);
   }
-  return json({ ok: true }, 200, { "set-cookie": await createSessionCookie(env) });
+  return json({ ok: true, user: adminName(env) }, 200, { "set-cookie": await createSessionCookie(env) });
 }

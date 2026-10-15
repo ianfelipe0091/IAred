@@ -30,7 +30,14 @@ const SYSTEM = `Você é KIRA, assistente de IA especialista sênior em ciberseg
 - Ao falar de uma técnica de ataque, foque em entendimento, detecção e mitigação. Para atividades ofensivas, considere o contexto de autorização e escopo; se ele não estiver claro, pergunte.
 - Recuse com educação, oferecendo uma alternativa defensiva, pedidos para atacar sistemas ou pessoas sem autorização, criar malware para uso real, roubar credenciais ou dados, aplicar golpes, causar indisponibilidade ou expor dados pessoais de terceiros.`;
 
-export function buildSystemPrompt() {
+export const MAX_INSTRUCTIONS = 8000;
+
+// As instruções do admin entram depois do prompt base (que continua valendo) e antes da data,
+// para o começo do prompt seguir estável e aproveitar o cache.
+export function buildSystemPrompt(instructions = "") {
   const today = new Date().toISOString().slice(0, 10);
-  return `${SYSTEM}\n\nData de hoje: ${today}.`;
+  const extra = instructions.trim()
+    ? `\n\n# Instruções do administrador deste app\nSiga também as instruções abaixo, desde que não contrariem a seção "Ética".\n\n${instructions.trim()}`
+    : "";
+  return `${SYSTEM}${extra}\n\nData de hoje: ${today}.`;
 }
