@@ -41,7 +41,7 @@ A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagaçã
 
 Na página **Modelos** do painel, adicione um ou mais modelos (URL + token + modelo; há atalhos para OpenRouter, Anthropic, OpenAI, Gemini e Groq). O painel reconhece o provedor, lista os modelos, testa o escolhido e só então salva. Marque o padrão com **Tornar padrão** e remova com a lixeira.
 
-Na página **Instruções**, escolha se valem para **todos os modelos** ou **modelos específicos**, escreva o texto (até 8.000 caracteres) e use **Ver o que é enviado ao modelo** para conferir o prompt completo. A instrução tem prioridade sobre o estilo padrão; o uso responsável prevalece sempre.
+Na página **Instruções**, escolha se valem para **todos os modelos** ou **modelos específicos**, escreva o texto (sem limite de caracteres; o painel mostra o tamanho estimado em tokens, porque instruções longas ocupam o contexto do modelo e encarecem cada mensagem) e use **Ver o que é enviado ao modelo** para conferir o prompt completo. A instrução tem prioridade sobre o estilo padrão; o uso responsável prevalece sempre.
 
 ### Login dos usuários
 

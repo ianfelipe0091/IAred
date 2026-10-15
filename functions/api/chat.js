@@ -39,6 +39,13 @@ export async function onRequestPost({ request, env }) {
   const targets = promptConfig?.targets;
   const applies = promptConfig?.instructions && (!targets || targets === "all" || (Array.isArray(targets) && targets.includes(engine.id)));
   const system = buildSystemPrompt(applies ? promptConfig.instructions : "");
+  // Instruções muito longas podem não caber no contexto do modelo escolhido.
+  if (system.length / CHARS_PER_TOKEN > engine.contextTokens - engine.maxTokens - 4096) {
+    return json(
+      { error: "As instruções configuradas pelo administrador são grandes demais para este modelo. Escolha outro modelo ou avise o administrador." },
+      413,
+    );
+  }
   const { kept, dropped } = fitToContext(messages, engine, system);
   if (!kept.length) {
     return json({ error: "Sua mensagem é grande demais. Reduza o texto e tente de novo." }, 413);

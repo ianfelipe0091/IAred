@@ -1,6 +1,9 @@
 import { deletePromptConfig, hasStorage, loadPromptConfig, modelsView, savePromptConfig } from "../../_lib/config.js";
 import { json, readJson } from "../../_lib/http.js";
-import { MAX_INSTRUCTIONS, promptParts } from "../../_lib/prompt.js";
+import { promptParts } from "../../_lib/prompt.js";
+
+// Sem limite de caracteres: o único teto é o de armazenamento do KV (25 MiB por valor).
+const STORAGE_LIMIT_BYTES = 24 * 1024 * 1024;
 
 const noStorage = () => json({ error: 'Falta o armazenamento do painel (KV "CONFIG").' }, 503);
 
@@ -19,7 +22,6 @@ async function view(env, config) {
     instructions,
     targets: config?.targets || "all",
     updatedAt: config?.updatedAt || null,
-    max: MAX_INSTRUCTIONS,
     models: models.map((m) => ({ id: m.id, label: m.label || m.model })),
     // Partes do prompt para o painel montar o preview ao vivo (parte fixa + onde a instrução entra).
     parts: promptParts(),
@@ -36,8 +38,8 @@ export async function onRequestPut({ request, env }) {
   if (!hasStorage(env)) return noStorage();
   const body = (await readJson(request)) || {};
   const instructions = String(body.instructions ?? "").replace(/\r\n/g, "\n").trim();
-  if (instructions.length > MAX_INSTRUCTIONS) {
-    return json({ error: `As instruções passam do limite de ${MAX_INSTRUCTIONS.toLocaleString("pt-BR")} caracteres.` }, 400);
+  if (new TextEncoder().encode(instructions).length > STORAGE_LIMIT_BYTES) {
+    return json({ error: "As instruções passam do limite de armazenamento (24 MB)." }, 400);
   }
   if (!instructions) {
     await deletePromptConfig(env);

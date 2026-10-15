@@ -403,10 +403,18 @@ $("#toggle-token").addEventListener("click", (e) => {
 
 // ---------------- Instruções ----------------
 
+// Sem limite: mostra o tamanho e uma estimativa de tokens, que é o que ocupa o contexto do modelo.
+const LONG_TOKENS = 30_000;
+
 function updateCounter() {
-  const max = Number(els.promptText.maxLength) || 8000;
-  els.promptCounter.textContent = `${fmtNumber(els.promptText.value.length)} / ${fmtNumber(max)}`;
-  els.promptCounter.classList.toggle("near", els.promptText.value.length > max * 0.9);
+  const chars = els.promptText.value.length;
+  const tokens = Math.ceil(chars / 3.5);
+  els.promptCounter.textContent = `${fmtNumber(chars)} caracteres · ~${fmtNumber(tokens)} tokens`;
+  els.promptCounter.classList.toggle("near", tokens > LONG_TOKENS);
+  els.promptCounter.title =
+    tokens > LONG_TOKENS
+      ? "Instruções longas ocupam o contexto do modelo: cada mensagem fica mais cara e lenta, e modelos com contexto pequeno podem recusar."
+      : "";
 }
 
 function setScope(scope) {
@@ -440,7 +448,6 @@ function updatePreview() {
 function renderPrompt(data) {
   state.prompt = { instructions: data.instructions, targets: data.targets, updatedAt: data.updatedAt };
   state.promptParts = data.parts;
-  if (data.max) els.promptText.maxLength = data.max;
   els.promptText.value = data.instructions || "";
   state.targets = Array.isArray(data.targets) ? data.targets : [];
   setScope(data.targets === "all" || !Array.isArray(data.targets) ? "all" : "some");

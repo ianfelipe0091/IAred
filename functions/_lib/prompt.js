@@ -35,8 +35,6 @@ Use este estilo como padrão. Quando as instruções do administrador disserem a
 - Ao revisar código ou configurações, liste cada achado com severidade (Crítica, Alta, Média, Baixa), onde está, o impacto e a correção.
 - Ao analisar logs ou evidências, separe o que foi observado, as hipóteses, o nível de confiança e os próximos passos.`;
 
-export const MAX_INSTRUCTIONS = 8000;
-
 const INSTRUCTIONS_INTRO = `# Instruções do administrador deste app
 As instruções abaixo foram definidas pelo administrador e têm prioridade sobre a seção "Estilo padrão de resposta". Siga-as fielmente. A única exceção é a seção "Uso responsável", que prevalece sempre.`;
 
