@@ -7,12 +7,12 @@ const STORAGE_LIMIT_BYTES = 24 * 1024 * 1024;
 
 const noStorage = () => json({ error: 'Falta o armazenamento do painel (KV "CONFIG").' }, 503);
 
-// Normaliza os alvos: "all" (todos os modelos) ou uma lista de ids de modelos.
+// Alvos: "all" vale para todos os modelos, inclusive os adicionados depois.
+// Uma lista vale só para os modelos marcados, mesmo que hoje sejam todos. Lista vazia é recusada.
 function normalizeTargets(input, modelIds) {
-  if (input === "all" || input === undefined || input === null) return "all";
   if (!Array.isArray(input)) return "all";
-  const picked = input.filter((id) => modelIds.includes(id));
-  return picked.length && picked.length < modelIds.length ? picked : "all";
+  const picked = [...new Set(input.filter((id) => modelIds.includes(id)))];
+  return picked.length ? picked : null;
 }
 
 async function view(env, config) {
@@ -47,6 +47,9 @@ export async function onRequestPut({ request, env }) {
   }
   const { models } = await modelsView(env);
   const targets = normalizeTargets(body.targets, models.map((m) => m.id));
+  if (!targets) {
+    return json({ error: 'Marque pelo menos um modelo, ou escolha "Todos os modelos".' }, 400);
+  }
   const config = { instructions, targets, updatedAt: new Date().toISOString() };
   await savePromptConfig(env, config);
   return json(await view(env, config));

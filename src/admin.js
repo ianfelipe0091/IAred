@@ -32,6 +32,7 @@ const els = {
   promptForm: $("#prompt-form"),
   promptScope: $("#prompt-scope"),
   promptTargets: $("#prompt-targets"),
+  promptScopeHelp: $("#prompt-scope-help"),
   promptText: $("#prompt-text"),
   promptCounter: $("#prompt-counter"),
   promptPreview: $("#prompt-preview"),
@@ -205,8 +206,7 @@ function renderOverview() {
   const def = state.models.find((m) => m.id === state.defaultId) || state.models[0];
   const a = state.auth;
   const chars = state.prompt?.instructions?.length || 0;
-  const targetsLabel =
-    !chars || !state.prompt ? "" : state.prompt.targets === "all" ? "todos os modelos" : `${(state.prompt.targets || []).length} modelo(s)`;
+  const targetsLabel = describeTargets(state.prompt?.targets);
 
   els.stats.innerHTML = [
     stat({
@@ -224,7 +224,7 @@ function renderOverview() {
       title: "Instruções",
       badge: chars ? { kind: "ok", text: "Definidas" } : { kind: "", text: "Padrão" },
       value: chars ? `${fmtNumber(chars)} caracteres` : "Só o prompt padrão",
-      meta: chars ? `Para ${targetsLabel}. Atualizadas em ${fmtDate(state.prompt.updatedAt)}.` : "Nenhuma instrução extra.",
+      meta: chars ? `Valem para: ${targetsLabel}. Atualizadas em ${fmtDate(state.prompt.updatedAt)}.` : "Nenhuma instrução extra.",
     }),
     stat({
       page: "usuarios",
@@ -261,6 +261,7 @@ async function showPanel(user) {
     return;
   }
   setModelsState(models.value);
+  if (state.promptData) renderPrompt(state.promptData); // os alvos e o aviso dependem da lista de modelos
   renderOverview();
 }
 
@@ -417,6 +418,13 @@ function updateCounter() {
       : "";
 }
 
+// Texto legível dos alvos: "todos os modelos" ou os nomes dos modelos marcados.
+function describeTargets(targets) {
+  if (!Array.isArray(targets)) return "todos os modelos";
+  const names = targets.map((id) => state.models.find((m) => m.id === id)).filter(Boolean).map(modelLabel);
+  return names.length ? names.join(", ") : "nenhum modelo";
+}
+
 function setScope(scope) {
   state.scope = scope;
   els.promptScope.querySelectorAll("[data-scope]").forEach((b) => {
@@ -424,6 +432,10 @@ function setScope(scope) {
     b.setAttribute("aria-checked", String(b.dataset.scope === scope));
   });
   els.promptTargets.hidden = scope !== "some";
+  els.promptScopeHelp.textContent =
+    scope === "all"
+      ? "Vale para todos os modelos, inclusive os que você adicionar depois."
+      : "Vale só para os modelos marcados. Modelos adicionados depois não recebem estas instruções.";
 }
 
 function renderTargets() {
@@ -446,6 +458,7 @@ function updatePreview() {
 }
 
 function renderPrompt(data) {
+  state.promptData = data;
   state.prompt = { instructions: data.instructions, targets: data.targets, updatedAt: data.updatedAt };
   state.promptParts = data.parts;
   els.promptText.value = data.instructions || "";
@@ -454,7 +467,13 @@ function renderPrompt(data) {
   renderTargets();
   updateCounter();
   updatePreview();
-  setStatus(els.promptStatus, "");
+  // Se o único modelo marcado foi removido, as instruções ficam sem valer para ninguém: avisa.
+  const orphan = data.instructions && Array.isArray(data.targets) && !data.targets.some((id) => state.models.some((m) => m.id === id));
+  setStatus(
+    els.promptStatus,
+    orphan && state.models.length ? 'Estas instruções não valem para nenhum modelo agora. Marque um modelo ou escolha "Todos os modelos".' : "",
+    orphan ? "error" : "",
+  );
 }
 
 async function loadPrompt() {
@@ -488,13 +507,20 @@ function targetsPayload() {
 }
 
 async function savePrompt(instructions) {
+  const targets = targetsPayload();
+  if (instructions.trim() && Array.isArray(targets) && !targets.length) {
+    setStatus(els.promptStatus, 'Marque pelo menos um modelo, ou escolha "Todos os modelos".', "error");
+    return;
+  }
   els.promptSave.disabled = true;
   try {
-    renderPrompt(await api("instructions", "PUT", { instructions, targets: targetsPayload() }));
+    renderPrompt(await api("instructions", "PUT", { instructions, targets }));
     renderOverview();
     setStatus(
       els.promptStatus,
-      instructions.trim() ? "Salvo. As próximas mensagens já seguem estas instruções." : "Instruções removidas. O modelo usa só o prompt padrão.",
+      instructions.trim()
+        ? `Salvo. Valem para: ${describeTargets(state.prompt.targets)}.`
+        : "Instruções removidas. O modelo usa só o prompt padrão.",
       "ok",
     );
     toast("Instruções salvas");
