@@ -6,7 +6,8 @@ pages_build_output_dir = "./dist"
 [ai]
 binding = "AI"
 
-# Painel administrativo (/admin): precisa do KV "CONFIG" e do secret ADMIN_PASSWORD.
+# Painel administrativo (/admin): precisa do KV "CONFIG" e dos secrets ADMIN_USER e ADMIN_PASSWORD.
 #   npx wrangler kv namespace create kira-config --binding CONFIG --update-config
+#   npx wrangler pages secret put ADMIN_USER --project-name kira
 #   npx wrangler pages secret put ADMIN_PASSWORD --project-name kira
 # Opcional: ANTHROPIC_API_KEY (secret) é usada enquanto o painel não tiver uma IA configurada.

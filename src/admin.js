@@ -6,6 +6,7 @@ const els = {
   views: { loading: $("#view-loading"), setup: $("#view-setup"), login: $("#view-login"), panel: $("#view-panel") },
   logout: $("#logout"),
   setupSteps: $("#setup-steps"),
+  user: $("#user"),
   password: $("#password"),
   loginStatus: $("#login-status"),
   loginBtn: $("#login-btn"),
@@ -84,10 +85,14 @@ function showSetup(session) {
     steps.push(`Crie o armazenamento do painel (o comando já grava no <b>wrangler.toml</b>):
       <code>npx wrangler kv namespace create kira-config --binding CONFIG --update-config</code>`);
   }
-  if (!session.passwordSet) {
-    steps.push(`Defina a senha do administrador, com pelo menos ${session.minPassword} caracteres:
-      <code>npx wrangler pages secret put ADMIN_PASSWORD --project-name kira</code>
-      <small>${session.passwordTooShort ? "A senha atual é curta demais. " : ""}Também dá para criar o secret no painel da Cloudflare: Workers &amp; Pages → kira → Settings → Variables and Secrets.</small>`);
+  if (!session.userSet || !session.passwordSet) {
+    const missing = [
+      !session.userSet && `<code>npx wrangler pages secret put ADMIN_USER --project-name kira</code>`,
+      !session.passwordSet && `<code>npx wrangler pages secret put ADMIN_PASSWORD --project-name kira</code>`,
+    ].filter(Boolean);
+    steps.push(`Defina o usuário e a senha do administrador (senha com pelo menos ${session.minPassword} caracteres):
+      ${missing.join("")}
+      <small>${session.passwordTooShort ? "A senha atual é curta demais. " : ""}Também dá para criar os secrets no painel da Cloudflare: Workers &amp; Pages → kira → Settings → Variables and Secrets.</small>`);
   }
   steps.push(`Publique de novo e recarregue esta página:
     <code>npm run deploy</code>`);
@@ -101,7 +106,7 @@ function showLogin(message = "") {
   setStatus(els.loginStatus, message, message ? "error" : "");
   els.password.value = "";
   show("login");
-  els.password.focus();
+  (els.user.value ? els.password : els.user).focus();
 }
 
 els.views.login.addEventListener("submit", async (e) => {
@@ -109,7 +114,7 @@ els.views.login.addEventListener("submit", async (e) => {
   els.loginBtn.disabled = true;
   setStatus(els.loginStatus, "Entrando…");
   try {
-    await api("login", "POST", { password: els.password.value });
+    await api("login", "POST", { user: els.user.value, password: els.password.value });
     els.password.value = "";
     await showPanel();
   } catch (err) {
@@ -286,7 +291,7 @@ async function boot() {
     els.views.loading.textContent = `Não foi possível abrir o painel: ${err.message}`;
     return;
   }
-  if (!session.passwordSet || !session.storage) return showSetup(session);
+  if (!session.userSet || !session.passwordSet || !session.storage) return showSetup(session);
   if (!session.authenticated) return showLogin();
   return showPanel();
 }

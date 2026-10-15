@@ -1,4 +1,4 @@
-import { MIN_PASSWORD, isAdmin, passwordConfigured } from "../../_lib/admin-auth.js";
+import { MIN_PASSWORD, isAdmin, passwordConfigured, userConfigured } from "../../_lib/admin-auth.js";
 import { hasStorage } from "../../_lib/config.js";
 import { json } from "../../_lib/http.js";
 
@@ -6,6 +6,7 @@ import { json } from "../../_lib/http.js";
 export async function onRequestGet({ request, env }) {
   return json({
     authenticated: await isAdmin(request, env),
+    userSet: userConfigured(env),
     passwordSet: passwordConfigured(env),
     passwordTooShort: Boolean(env.ADMIN_PASSWORD) && !passwordConfigured(env),
     minPassword: MIN_PASSWORD,

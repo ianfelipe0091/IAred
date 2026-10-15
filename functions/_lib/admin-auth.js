@@ -1,15 +1,23 @@
-// Login do painel: senha no secret ADMIN_PASSWORD e sessão em cookie assinado (HMAC).
+// Login do painel: usuário e senha nos secrets ADMIN_USER e ADMIN_PASSWORD,
+// sessão em cookie assinado (HMAC).
 
 const COOKIE = "kira_admin";
 const SESSION_SECONDS = 8 * 60 * 60;
-export const MIN_PASSWORD = 12;
+export const MIN_PASSWORD = 10;
 const MAX_FAILS = 10;
 const FAIL_WINDOW_SECONDS = 15 * 60;
 
 const enc = new TextEncoder();
 
+// O usuário não diferencia maiúsculas de minúsculas; a senha, sim.
+const normalizeUser = (user) => String(user ?? "").trim().toLowerCase();
+
+export const userConfigured = (env) => normalizeUser(env.ADMIN_USER) !== "";
+
 export const passwordConfigured = (env) =>
   typeof env.ADMIN_PASSWORD === "string" && env.ADMIN_PASSWORD.length >= MIN_PASSWORD;
+
+export const credentialsConfigured = (env) => userConfigured(env) && passwordConfigured(env);
 
 const b64url = (buf) =>
   btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -19,16 +27,27 @@ const fromB64url = (text) =>
 
 const digest = (text) => crypto.subtle.digest("SHA-256", enc.encode(text));
 
-// A chave da sessão deriva da senha: trocar a senha encerra todas as sessões.
+// A chave da sessão deriva do usuário e da senha: trocar qualquer um encerra todas as sessões.
 const sessionKey = (env) =>
-  crypto.subtle.importKey("raw", enc.encode(`kira-admin:${env.ADMIN_PASSWORD}`), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-    "verify",
-  ]);
+  crypto.subtle.importKey(
+    "raw",
+    enc.encode(`kira-admin:${normalizeUser(env.ADMIN_USER)}:${env.ADMIN_PASSWORD}`),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
 
-export async function checkPassword(env, password) {
-  const [given, expected] = await Promise.all([digest(String(password ?? "")), digest(env.ADMIN_PASSWORD)]);
-  return crypto.subtle.timingSafeEqual(given, expected);
+// Compara os dois em tempo constante e sem revelar qual deles estava errado.
+export async function checkCredentials(env, user, password) {
+  const [givenUser, expectedUser, givenPass, expectedPass] = await Promise.all([
+    digest(normalizeUser(user)),
+    digest(normalizeUser(env.ADMIN_USER)),
+    digest(String(password ?? "")),
+    digest(env.ADMIN_PASSWORD),
+  ]);
+  const userOk = crypto.subtle.timingSafeEqual(givenUser, expectedUser);
+  const passOk = crypto.subtle.timingSafeEqual(givenPass, expectedPass);
+  return userOk && passOk;
 }
 
 const cookie = (value, maxAge) => `${COOKIE}=${value}; Path=/api/admin; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
@@ -50,7 +69,7 @@ function readCookie(request, name) {
 }
 
 export async function isAdmin(request, env) {
-  if (!passwordConfigured(env)) return false;
+  if (!credentialsConfigured(env)) return false;
   const match = /^(\d+)\.([A-Za-z0-9_-]+)$/.exec(readCookie(request, COOKIE));
   if (!match || Number(match[1]) < Date.now() / 1000) return false;
   try {

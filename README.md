@@ -62,14 +62,15 @@ Configuração única (com o Wrangler logado na conta da Cloudflare):
 # 1. Armazenamento da configuração (já grava o binding CONFIG no wrangler.toml)
 npx wrangler kv namespace create kira-config --binding CONFIG --update-config
 
-# 2. Senha do admin (mínimo de 12 caracteres)
+# 2. Usuário e senha do admin (senha com no mínimo 10 caracteres)
+npx wrangler pages secret put ADMIN_USER --project-name kira
 npx wrangler pages secret put ADMIN_PASSWORD --project-name kira
 
 # 3. Publicar
 npm run deploy
 ```
 
-Depois, abra `https://kira-cb0.pages.dev/admin`, entre com a senha e preencha:
+Depois, abra `https://kira-cb0.pages.dev/admin`, entre com o usuário e a senha e preencha:
 
 1. **URL da API** (ex.: `https://api.openai.com/v1`). Em branco, o KIRA tenta reconhecer pelo token.
 2. **Token da IA**.
@@ -78,7 +79,7 @@ Depois, abra `https://kira-cb0.pages.dev/admin`, entre com a senha e preencha:
 
 A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagação do KV). Para voltar ao modelo gratuito, use **Remover configuração**.
 
-Segurança do painel: sessão em cookie `HttpOnly`/`SameSite=Strict` assinado com HMAC (8 h), bloqueio por 15 min após 10 senhas erradas, as rotas de escrita só aceitam requisições do próprio site e o token nunca é devolvido ao navegador (o painel mostra só os 4 últimos caracteres). Trocar a `ADMIN_PASSWORD` encerra todas as sessões abertas.
+Segurança do painel: sessão em cookie `HttpOnly`/`SameSite=Strict` assinado com HMAC (8 h), bloqueio por 15 min após 10 tentativas erradas, as rotas de escrita só aceitam requisições do próprio site e o token nunca é devolvido ao navegador (o painel mostra só os 4 últimos caracteres). Trocar o `ADMIN_USER` ou a `ADMIN_PASSWORD` encerra todas as sessões abertas. O usuário não diferencia maiúsculas de minúsculas; a senha, sim.
 
 Enquanto o painel não tiver uma IA configurada, o secret opcional `ANTHROPIC_API_KEY` continua valendo como chave padrão do Claude.
 
