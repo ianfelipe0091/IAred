@@ -34,9 +34,10 @@ const els = {
   tokenHelp: $("#token-help"),
   toasts: $("#toasts"),
   promptForm: $("#prompt-form"),
-  promptScope: $("#prompt-scope"),
-  promptTargets: $("#prompt-targets"),
+  promptScopes: $("#prompt-scopes"),
   promptScopeHelp: $("#prompt-scope-help"),
+  promptLabel: $("#prompt-label"),
+  previewSummary: $("#preview-summary"),
   promptText: $("#prompt-text"),
   promptCounter: $("#prompt-counter"),
   promptPreview: $("#prompt-preview"),
@@ -64,9 +65,8 @@ const state = {
   models: [], // modelos salvos (sem token)
   defaultId: null,
   auth: null,
-  prompt: null,
-  scope: "all", // "all" ou "some"
-  targets: [], // ids marcados quando scope = "some"
+  promptData: null, // { all: { instructions, updatedAt }, models: [{ id, label, instructions, updatedAt }] }
+  scope: "all", // instruções em edição: "all" (todos os modelos) ou o id de um modelo
   names: new Map(),
   editingId: null, // id do modelo em edição; null = adicionando
 };
@@ -210,8 +210,16 @@ function renderOverview() {
   const count = state.models.length;
   const def = state.models.find((m) => m.id === state.defaultId) || state.models[0];
   const a = state.auth;
-  const chars = state.prompt?.instructions?.length || 0;
-  const targetsLabel = describeTargets(state.prompt?.targets);
+  const general = savedText("all");
+  const own = (state.promptData?.models || []).filter((m) => m.instructions && state.models.some((x) => x.id === m.id));
+  const hasPrompt = Boolean(general || own.length);
+  const ownLabel = own.length === 1 ? "1 modelo com instruções próprias" : `${own.length} modelos com instruções próprias`;
+  const promptMeta = [
+    general ? `Para todos: ${fmtNumber(general.length)} caracteres.` : "Nada para todos os modelos.",
+    own.length ? `Próprias: ${own.map((m) => modelLabel(state.models.find((x) => x.id === m.id))).join(", ")}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   els.stats.innerHTML = [
     stat({
@@ -227,9 +235,9 @@ function renderOverview() {
       page: "instrucoes",
       iconName: "doc",
       title: "Instruções",
-      badge: chars ? { kind: "ok", text: "Definidas" } : { kind: "", text: "Padrão" },
-      value: chars ? `${fmtNumber(chars)} caracteres` : "Só o prompt padrão",
-      meta: chars ? `Valem para: ${targetsLabel}. Atualizadas em ${fmtDate(state.prompt.updatedAt)}.` : "Nenhuma instrução extra.",
+      badge: hasPrompt ? { kind: "ok", text: "Definidas" } : { kind: "", text: "Padrão" },
+      value: !hasPrompt ? "Só o prompt padrão" : general ? (own.length ? `Todos os modelos + ${own.length}` : "Todos os modelos") : ownLabel,
+      meta: hasPrompt ? promptMeta : "Nenhuma instrução extra.",
     }),
     stat({
       page: "usuarios",
@@ -243,7 +251,7 @@ function renderOverview() {
   ].join("");
 
   $("#dot-modelos").classList.toggle("ok", count > 0);
-  $("#dot-instrucoes").classList.toggle("ok", chars > 0);
+  $("#dot-instrucoes").classList.toggle("ok", hasPrompt);
   $("#dot-usuarios").classList.toggle("ok", Boolean(a?.enabled));
 }
 
@@ -266,7 +274,7 @@ async function showPanel(user) {
     return;
   }
   setModelsState(models.value);
-  if (state.promptData) renderPrompt(state.promptData); // os alvos e o aviso dependem da lista de modelos
+  if (state.promptData) renderPrompt(state.promptData); // as abas dependem da lista de modelos
   renderOverview();
 }
 
@@ -276,7 +284,7 @@ function setModelsState({ models, defaultId }) {
   state.models = models || [];
   state.defaultId = defaultId;
   renderModelList();
-  renderTargets(); // os alvos das instruções dependem da lista de modelos
+  renderScopes(); // as abas das instruções dependem da lista de modelos
 }
 
 function renderModelList() {
@@ -483,78 +491,106 @@ function updateCounter() {
       : "";
 }
 
-// Texto legível dos alvos: "todos os modelos" ou os nomes dos modelos marcados.
-function describeTargets(targets) {
-  if (!Array.isArray(targets)) return "todos os modelos";
-  const names = targets.map((id) => state.models.find((m) => m.id === id)).filter(Boolean).map(modelLabel);
-  return names.length ? names.join(", ") : "nenhum modelo";
+// Cada aba tem o seu texto: "Todos os modelos" e um por modelo. Um não altera o outro.
+const scopeName = (scope) =>
+  scope === "all" ? "todos os modelos" : modelLabel(state.models.find((m) => m.id === scope) || { model: "modelo" });
+
+function savedText(scope) {
+  const data = state.promptData;
+  if (!data) return "";
+  if (scope === "all") return data.all?.instructions || "";
+  return data.models.find((m) => m.id === scope)?.instructions || "";
 }
 
-function setScope(scope) {
-  state.scope = scope;
-  els.promptScope.querySelectorAll("[data-scope]").forEach((b) => {
-    b.classList.toggle("active", b.dataset.scope === scope);
-    b.setAttribute("aria-checked", String(b.dataset.scope === scope));
-  });
-  els.promptTargets.hidden = scope !== "some";
+const isDirty = () => els.promptText.value !== savedText(state.scope);
+
+function renderScopes() {
+  // O modelo em edição foi removido: volta para "Todos os modelos" com o texto dele.
+  if (state.scope !== "all" && !state.models.some((m) => m.id === state.scope)) {
+    state.scope = "all";
+    if (state.promptData) showScopeText();
+  }
+  const btn = (scope, label) => {
+    const on = scope === state.scope;
+    const dot = savedText(scope) ? `<i class="scope-dot" title="Tem instruções"></i>` : "";
+    return `<button type="button" role="radio" aria-checked="${on}" class="${on ? "active" : ""}" data-scope="${esc(scope)}">${dot}<span>${esc(label)}</span></button>`;
+  };
+  els.promptScopes.innerHTML = [
+    btn("all", "Todos os modelos"),
+    state.models.length ? `<i class="scope-sep" aria-hidden="true"></i>` : "",
+    ...state.models.map((m) => btn(m.id, modelLabel(m))),
+  ].join("");
+  const name = scopeName(state.scope);
+  els.promptLabel.textContent = state.scope === "all" ? "Instruções para todos os modelos" : `Instruções só para ${name}`;
+  els.previewSummary.textContent = state.scope === "all" ? "Ver o que é enviado aos modelos" : `Ver o que é enviado a ${name}`;
   els.promptScopeHelp.textContent =
-    scope === "all"
-      ? "Vale para todos os modelos, inclusive os que você adicionar depois."
-      : "Vale só para os modelos marcados. Modelos adicionados depois não recebem estas instruções.";
+    state.scope === "all"
+      ? state.models.length
+        ? "Valem para todos os modelos, inclusive os que você adicionar depois. Para escrever algo só para um modelo, escolha o modelo acima."
+        : "Valem para todos os modelos, inclusive os que você adicionar depois."
+      : `Valem só para ${name}, junto com as de "Todos os modelos". Se as duas conflitarem, estas prevalecem. O texto de "Todos os modelos" não muda.`;
 }
 
-function renderTargets() {
-  els.promptTargets.innerHTML = state.models.length
-    ? state.models
-        .map(
-          (m) => `<label class="check"><input type="checkbox" value="${esc(m.id)}" ${state.targets.includes(m.id) ? "checked" : ""} />${esc(modelLabel(m))}</label>`,
-        )
-        .join("")
-    : `<p class="help">Nenhum modelo para escolher. Adicione modelos na página Modelos.</p>`;
+function selectScope(scope) {
+  if (scope === state.scope) return;
+  if (isDirty() && !confirm(`Descartar as alterações não salvas em "${scopeName(state.scope)}"?`)) return;
+  state.scope = scope;
+  renderScopes();
+  showScopeText();
+}
+
+function showScopeText() {
+  els.promptText.value = savedText(state.scope);
+  updateCounter();
+  updatePreview();
+  setStatus(els.promptStatus, "");
 }
 
 // Monta o preview ao vivo, na mesma ordem do servidor (buildSystemPrompt).
 function updatePreview() {
   const p = state.promptParts;
   if (!p) return;
-  const text = els.promptText.value.trim();
-  const blocks = [p.identity, p.responsible, text ? `${p.intro}\n\n${text}` : "", p.style, p.date].filter(Boolean);
+  const draft = els.promptText.value.trim();
+  const general = state.scope === "all" ? draft : savedText("all").trim();
+  const specific = state.scope === "all" ? "" : draft;
+  const body = general && specific ? `${p.generalHeading}\n\n${general}\n\n${p.specificHeading}\n\n${specific}` : general || specific;
+  const blocks = [p.identity, p.responsible, body ? `${p.intro}\n\n${body}` : "", p.style, p.date].filter(Boolean);
   els.promptPreview.textContent = blocks.join("\n\n");
 }
 
-function renderPrompt(data) {
+// keepDraft: ao recarregar por outro motivo (ex.: lista de modelos mudou), não apaga o que está sendo digitado.
+function renderPrompt(data, { keepDraft = false } = {}) {
+  const scope = state.scope;
+  const draft = keepDraft && state.promptData && isDirty() ? els.promptText.value : null;
   state.promptData = data;
-  state.prompt = { instructions: data.instructions, targets: data.targets, updatedAt: data.updatedAt };
   state.promptParts = data.parts;
-  els.promptText.value = data.instructions || "";
-  state.targets = Array.isArray(data.targets) ? data.targets : [];
-  setScope(data.targets === "all" || !Array.isArray(data.targets) ? "all" : "some");
-  renderTargets();
-  updateCounter();
-  updatePreview();
-  // Se o único modelo marcado foi removido, as instruções ficam sem valer para ninguém: avisa.
-  const orphan = data.instructions && Array.isArray(data.targets) && !data.targets.some((id) => state.models.some((m) => m.id === id));
-  setStatus(
-    els.promptStatus,
-    orphan && state.models.length ? 'Estas instruções não valem para nenhum modelo agora. Marque um modelo ou escolha "Todos os modelos".' : "",
-    orphan ? "error" : "",
-  );
+  renderScopes();
+  if (draft !== null && state.scope === scope) {
+    els.promptText.value = draft;
+    updateCounter();
+    updatePreview();
+  } else {
+    showScopeText();
+  }
 }
 
 async function loadPrompt() {
   try {
-    renderPrompt(await api("instructions"));
+    renderPrompt(await api("instructions"), { keepDraft: true });
   } catch (err) {
     setStatus(els.promptStatus, err.message, "error");
   }
 }
 
-els.promptScope.querySelectorAll("[data-scope]").forEach((b) => b.addEventListener("click", () => setScope(b.dataset.scope)));
+els.promptScopes.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-scope]");
+  if (b) selectScope(b.dataset.scope);
+});
 
 els.promptText.addEventListener("input", () => {
   updateCounter();
   updatePreview();
-  setStatus(els.promptStatus, els.promptText.value !== (state.prompt?.instructions || "") ? "Alterações não salvas." : "");
+  setStatus(els.promptStatus, isDirty() ? "Alterações não salvas." : "");
 });
 
 $("#prompt-examples").addEventListener("click", (e) => {
@@ -566,26 +602,22 @@ $("#prompt-examples").addEventListener("click", (e) => {
   els.promptText.focus();
 });
 
-function targetsPayload() {
-  if (state.scope === "all") return "all";
-  return [...els.promptTargets.querySelectorAll("input:checked")].map((i) => i.value);
-}
-
 async function savePrompt(instructions) {
-  const targets = targetsPayload();
-  if (instructions.trim() && Array.isArray(targets) && !targets.length) {
-    setStatus(els.promptStatus, 'Marque pelo menos um modelo, ou escolha "Todos os modelos".', "error");
-    return;
-  }
+  const scope = state.scope;
+  const name = scopeName(scope);
   els.promptSave.disabled = true;
   try {
-    renderPrompt(await api("instructions", "PUT", { instructions, targets }));
+    renderPrompt(await api("instructions", "PUT", { scope, instructions }));
     renderOverview();
     setStatus(
       els.promptStatus,
       instructions.trim()
-        ? `Salvo. Valem para: ${describeTargets(state.prompt.targets)}.`
-        : "Instruções removidas. O modelo usa só o prompt padrão.",
+        ? scope === "all"
+          ? "Salvo. Vale para todos os modelos."
+          : `Salvo. Vale só para ${name}.`
+        : scope === "all"
+          ? "Instruções para todos os modelos removidas."
+          : `Instruções de ${name} removidas.`,
       "ok",
     );
     toast("Instruções salvas");
@@ -602,8 +634,9 @@ els.promptForm.addEventListener("submit", (e) => {
 });
 
 $("#prompt-clear").addEventListener("click", () => {
-  if (!els.promptText.value.trim() && !state.prompt?.instructions) return;
-  if (!confirm("Apagar as instruções? O modelo volta a usar só o prompt padrão da KIRA.")) return;
+  if (!els.promptText.value.trim() && !savedText(state.scope)) return;
+  const what = state.scope === "all" ? "as instruções para todos os modelos" : `as instruções de ${scopeName(state.scope)}`;
+  if (!confirm(`Apagar ${what}? As outras instruções não mudam.`)) return;
   savePrompt("");
 });
 

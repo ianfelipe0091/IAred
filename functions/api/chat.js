@@ -34,11 +34,9 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Conversa grande demais. Inicie uma nova conversa." }, 413);
   }
 
-  // Instruções do admin, só se valerem para o modelo escolhido (todos, ou a lista de alvos).
-  const promptConfig = await loadPromptConfig(env);
-  const targets = promptConfig?.targets;
-  const applies = promptConfig?.instructions && (!targets || targets === "all" || (Array.isArray(targets) && targets.includes(engine.id)));
-  const system = buildSystemPrompt(applies ? promptConfig.instructions : "");
+  // Instruções do admin: as de todos os modelos + as próprias do modelo escolhido (se houver).
+  const instructions = await loadPromptConfig(env);
+  const system = buildSystemPrompt({ general: instructions.all?.text, specific: instructions.models[engine.id]?.text });
   // Instruções muito longas podem não caber no contexto do modelo escolhido.
   if (system.length / CHARS_PER_TOKEN > engine.contextTokens - engine.maxTokens - 4096) {
     return json(

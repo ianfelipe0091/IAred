@@ -38,16 +38,37 @@ Use este estilo como padrão. Quando as instruções do administrador disserem a
 const INSTRUCTIONS_INTRO = `# Instruções do administrador deste app
 As instruções abaixo foram definidas pelo administrador e têm prioridade sobre a seção "Estilo padrão de resposta". Siga-as fielmente. A única exceção é a seção "Uso responsável", que prevalece sempre.`;
 
+// Só usados quando o modelo tem os dois textos: o geral e o próprio.
+const GENERAL_HEADING = "## Para todos os modelos";
+const SPECIFIC_HEADING = `## Só para este modelo
+Se algo aqui conflitar com as instruções para todos os modelos, siga estas.`;
+
 const dateLine = () => `Data de hoje: ${new Date().toISOString().slice(0, 10)}.`;
 
-// Monta o prompt. A instrução do administrador tem prioridade sobre o ESTILO,
+// Bloco do administrador: o texto geral (todos os modelos) e o texto próprio do modelo escolhido.
+function adminBlock(general, specific) {
+  const g = String(general || "").trim();
+  const s = String(specific || "").trim();
+  if (!g && !s) return "";
+  const body = g && s ? `${GENERAL_HEADING}\n\n${g}\n\n${SPECIFIC_HEADING}\n\n${s}` : g || s;
+  return `${INSTRUCTIONS_INTRO}\n\n${body}`;
+}
+
+// Monta o prompt. As instruções do administrador têm prioridade sobre o ESTILO,
 // mas nunca sobre USO_RESPONSAVEL. Sem instrução, usa só o estilo padrão.
-export function buildSystemPrompt(instructions = "") {
-  const extra = String(instructions || "").trim() ? `${INSTRUCTIONS_INTRO}\n\n${String(instructions).trim()}` : "";
-  return [IDENTIDADE, USO_RESPONSAVEL, extra, ESTILO, dateLine()].filter(Boolean).join("\n\n");
+export function buildSystemPrompt({ general = "", specific = "" } = {}) {
+  return [IDENTIDADE, USO_RESPONSAVEL, adminBlock(general, specific), ESTILO, dateLine()].filter(Boolean).join("\n\n");
 }
 
 // Partes do prompt para o painel montar o preview ao vivo, na mesma ordem de buildSystemPrompt.
 export function promptParts() {
-  return { identity: IDENTIDADE, responsible: USO_RESPONSAVEL, intro: INSTRUCTIONS_INTRO, style: ESTILO, date: dateLine() };
+  return {
+    identity: IDENTIDADE,
+    responsible: USO_RESPONSAVEL,
+    intro: INSTRUCTIONS_INTRO,
+    generalHeading: GENERAL_HEADING,
+    specificHeading: SPECIFIC_HEADING,
+    style: ESTILO,
+    date: dateLine(),
+  };
 }

@@ -103,10 +103,11 @@ export async function onRequestDelete({ request, env }) {
     const { list, defaultId } = await loadModels(env);
     const next = list.filter((m) => m.id !== body.id);
     await saveModels(env, { list: next, defaultId: next.some((m) => m.id === defaultId) ? defaultId : next[0]?.id || null });
-    // Tira o modelo removido dos alvos das instruções (a instrução nunca passa a valer para "todos" sozinha).
+    // Apaga as instruções próprias do modelo removido (as de todos os modelos não mudam).
     const prompt = await loadPromptConfig(env);
-    if (Array.isArray(prompt?.targets) && prompt.targets.includes(body.id)) {
-      await savePromptConfig(env, { ...prompt, targets: prompt.targets.filter((id) => id !== body.id) });
+    if (prompt.models[body.id]) {
+      delete prompt.models[body.id];
+      await savePromptConfig(env, prompt);
     }
     return json(await modelsView(env));
   });

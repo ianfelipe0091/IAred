@@ -180,21 +180,17 @@
           <form class="panel-card" id="prompt-form" autocomplete="off">
             <div class="panel-card-head">
               <h2>Instruções para o modelo</h2>
-              <p>Enviadas nas conversas para personalizar o comportamento: tom, público, formato das respostas ou informações do seu negócio.</p>
+              <p>Enviadas nas conversas para personalizar o comportamento: tom, público, formato das respostas ou informações do seu negócio. Escreva instruções para todos os modelos e, se quiser, instruções próprias para cada modelo.</p>
             </div>
             <div class="panel-card-body">
               <div class="field">
-                <label>Aplicar a</label>
-                <div class="seg" id="prompt-scope" role="radiogroup" aria-label="Aplicar as instruções a">
-                  <button type="button" role="radio" data-scope="all">Todos os modelos</button>
-                  <button type="button" role="radio" data-scope="some">Modelos específicos</button>
-                </div>
-                <div class="targets" id="prompt-targets" hidden></div>
+                <label>Editar instruções de</label>
+                <div class="scopes" id="prompt-scopes" role="radiogroup" aria-label="Editar instruções de"></div>
                 <p class="help" id="prompt-scope-help"></p>
               </div>
               <div class="field">
                 <div class="field-top">
-                  <label for="prompt-text">Instruções</label>
+                  <label for="prompt-text" id="prompt-label">Instruções para todos os modelos</label>
                   <span class="counter" id="prompt-counter">0 caracteres</span>
                 </div>
                 <textarea id="prompt-text" class="textarea" rows="14" placeholder="Ex.: Responda de forma curta e direta. O público são analistas de SOC iniciantes, então explique siglas na primeira vez que aparecerem."></textarea>
@@ -211,7 +207,7 @@
                 <p>A sua instrução tem prioridade sobre o estilo padrão da KIRA. A única parte que ela não sobrepõe são as regras de uso responsável (não ajudar em ataque sem autorização, malware, roubo de dados).</p>
               </div>
               <details class="advanced" id="preview-box">
-                <summary>Ver o que é enviado ao modelo</summary>
+                <summary id="preview-summary">Ver o que é enviado ao modelo</summary>
                 <pre class="preview" id="prompt-preview"></pre>
               </details>
             </div>

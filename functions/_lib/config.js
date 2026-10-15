@@ -1,6 +1,8 @@
 // Configurações definidas no painel administrativo, guardadas no KV "CONFIG":
 //   "models" lista de modelos { list: [ { id, provider, format, baseURL, apiKey, model, label, contextTokens, maxOutput, options } ], defaultId }
-//   "prompt" instruções extras do admin { instructions, targets: "all" | [modelId], updatedAt }
+//   "prompt" instruções do admin, um texto por escopo:
+//            { all: { text, updatedAt }, models: { [modelId]: { text, updatedAt } } }
+//            (o formato antigo { instructions, targets } é convertido ao carregar)
 //   "ai" / "free" formato antigo (IA principal / opção gratuita), migrados para "models" ao carregar.
 
 const CACHE_MS = 15_000;
@@ -35,9 +37,33 @@ export const hasStorage = (env) => Boolean(env.CONFIG);
 
 export const saveModels = models.save;
 
-export const loadPromptConfig = prompt.load;
-export const savePromptConfig = prompt.save;
-export const deletePromptConfig = prompt.remove;
+// Instruções do admin. "all" vale para todos os modelos; "models" guarda um texto próprio por modelo,
+// separado do geral (escrever para um modelo nunca altera o texto de "todos os modelos").
+function normalizePrompt(raw) {
+  const out = { all: null, models: {} };
+  if (!raw) return out;
+  // Formato antigo: um texto só + para quem vale.
+  if (typeof raw.instructions === "string") {
+    if (!raw.instructions.trim()) return out;
+    const entry = { text: raw.instructions, updatedAt: raw.updatedAt || null };
+    if (Array.isArray(raw.targets)) for (const id of raw.targets) out.models[id] = entry;
+    else out.all = entry;
+    return out;
+  }
+  if (raw.all?.text) out.all = raw.all;
+  for (const [id, entry] of Object.entries(raw.models || {})) if (entry?.text) out.models[id] = entry;
+  return out;
+}
+
+export async function loadPromptConfig(env) {
+  return normalizePrompt(await prompt.load(env));
+}
+
+export async function savePromptConfig(env, config) {
+  const clean = normalizePrompt(config);
+  if (!clean.all && !Object.keys(clean.models).length) return prompt.remove(env);
+  return prompt.save(env, clean);
+}
 
 // Campos de um modelo visíveis fora do servidor (sem baseURL interno além do provedor).
 const MODEL_FIELDS = ["id", "provider", "format", "baseURL", "apiKey", "model", "label", "contextTokens", "maxOutput", "options"];

@@ -10,7 +10,7 @@ No **painel administrativo** (`/admin`) você conecta um ou mais **modelos de IA
 
 Os usuários não colam chave nenhuma: os tokens ficam só no servidor (KV da Cloudflare) e nunca vão para o navegador.
 
-**Instruções:** você escreve instruções que vão para o modelo em todas as conversas, podendo valer para todos os modelos ou só para alguns. A instrução do administrador tem prioridade sobre o estilo padrão da KIRA; as regras de uso responsável do prompt padrão continuam valendo e não podem ser desligadas por instrução. O painel mostra o texto exato enviado ao modelo.
+**Instruções:** você escreve instruções que vão para o modelo em todas as conversas: um texto para todos os modelos e, se quiser, um texto próprio para cada modelo (um não altera o outro). A instrução do administrador tem prioridade sobre o estilo padrão da KIRA; as regras de uso responsável do prompt padrão continuam valendo e não podem ser desligadas por instrução. O painel mostra o texto exato enviado ao modelo.
 
 ## Painel administrativo
 
@@ -41,7 +41,7 @@ A mudança chega a todos os usuários em cerca de 1 minuto (tempo de propagaçã
 
 Na página **Modelos** do painel, adicione um ou mais modelos (URL + token + modelo; há atalhos para OpenRouter, Anthropic, OpenAI, Gemini e Groq). O painel reconhece o provedor, lista os modelos, testa o escolhido e só então salva. Marque o padrão com **Tornar padrão**, altere com o lápis e remova com a lixeira. Na edição, mudar só o nome salva direto; mudar URL, token ou modelo faz o painel testar de novo antes de salvar. Deixe o token em branco para manter o salvo (se trocar a URL, cole o token de novo). O modelo editado continua padrão e continua recebendo as instruções marcadas para ele.
 
-Na página **Instruções**, escolha se valem para **todos os modelos** ou **modelos específicos**, escreva o texto (sem limite de caracteres; o painel mostra o tamanho estimado em tokens, porque instruções longas ocupam o contexto do modelo e encarecem cada mensagem) e use **Ver o que é enviado ao modelo** para conferir o prompt completo. A instrução tem prioridade sobre o estilo padrão; o uso responsável prevalece sempre.
+Na página **Instruções**, escolha a aba **Todos os modelos** (vale para todos, inclusive os adicionados depois) ou a aba de um modelo (texto só dele, enviado junto com o de todos os modelos e com prioridade sobre ele em caso de conflito). Cada aba tem o seu texto; escreva (sem limite de caracteres; o painel mostra o tamanho estimado em tokens, porque instruções longas ocupam o contexto do modelo e encarecem cada mensagem) e use **Ver o que é enviado ao modelo** para conferir o prompt completo. A instrução tem prioridade sobre o estilo padrão; o uso responsável prevalece sempre.
 
 ### Login dos usuários
 

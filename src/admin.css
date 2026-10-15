@@ -123,9 +123,6 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
 .detected svg { width: 15px; height: 15px; color: var(--ok); }
 .detected.error { color: var(--danger); }
 
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: var(--surface-2); }
-.seg button { min-height: 34px; padding: 4px 8px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--text-2); transition: background .15s, color .15s; }
-.seg button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
 
 .advanced summary { width: fit-content; cursor: pointer; font-size: 13px; color: var(--text-2); }
 .advanced[open] summary { margin-bottom: 14px; }
@@ -148,9 +145,13 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
 #model-form.editing { border-color: color-mix(in srgb, var(--a2) 45%, var(--border-strong)); }
 
 /* ---------- Alvos das instruções e preview ---------- */
-.targets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.check { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--bg); font-size: 13px; cursor: pointer; }
-.check input { accent-color: var(--a2); }
+.scopes { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 11px; background: var(--surface-2); }
+.scopes button { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; max-width: 100%; padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-2); transition: background .15s, color .15s; }
+.scopes button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scopes button:hover { color: var(--text); }
+.scopes button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.scopes .scope-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.scopes .scope-sep { align-self: center; width: 1px; height: 18px; margin: 0 2px; background: var(--border-strong); }
 .preview { margin: 12px 0 0; max-height: 320px; overflow: auto; padding: 14px; border-radius: 10px; background: var(--code-bg); color: var(--code-text); font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 13px; color: var(--text-2); }
