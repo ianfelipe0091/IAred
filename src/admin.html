@@ -110,8 +110,8 @@
 
           <form class="panel-card" id="model-form" autocomplete="off">
             <div class="panel-card-head">
-              <h2>Adicionar modelo</h2>
-              <p>Cole a URL da API e o token. O KIRA reconhece o provedor sozinho.</p>
+              <h2 id="model-form-title">Adicionar modelo</h2>
+              <p id="model-form-desc">Cole a URL da API e o token. O KIRA reconhece o provedor sozinho.</p>
             </div>
             <div class="panel-card-body">
               <div class="field">
@@ -134,7 +134,7 @@
                   <input id="token" class="input mono" type="password" placeholder="sk-…" spellcheck="false" autocapitalize="off" autocomplete="off" />
                   <button type="button" class="icon-btn" id="toggle-token" aria-label="Mostrar token" data-icon="eye"></button>
                 </div>
-                <p class="help">Fica guardado só no servidor e nunca é mostrado aos usuários.</p>
+                <p class="help" id="token-help">Fica guardado só no servidor e nunca é mostrado aos usuários.</p>
               </div>
 
               <div class="inline-actions">
@@ -169,6 +169,7 @@
             </div>
             <footer class="panel-card-foot">
               <p class="key-status" id="model-status"></p>
+              <button type="button" class="btn ghost small" id="model-cancel" hidden>Cancelar</button>
               <button type="submit" class="btn primary" id="model-add">Testar e adicionar</button>
             </footer>
           </form>

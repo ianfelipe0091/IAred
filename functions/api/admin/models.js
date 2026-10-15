@@ -7,7 +7,7 @@ import {
   saveModels,
   toModel,
 } from "../../_lib/config.js";
-import { ConfigError, buildConfig, detectProvider, testConfig } from "../../_lib/detect.js";
+import { ConfigError, buildConfig, credentials, detectProvider, testConfig } from "../../_lib/detect.js";
 import { json, readJson } from "../../_lib/http.js";
 
 const noStorage = () => json({ error: 'Falta o armazenamento do painel (KV "CONFIG").' }, 503);
@@ -46,6 +46,39 @@ export async function onRequestPost({ request, env }) {
     list.push(entry);
     const next = { list, defaultId: defaultId || entry.id };
     await saveModels(env, next);
+    return json(await modelsView(env));
+  });
+}
+
+const sameURL = (a, b) => String(a || "").trim().replace(/\/+$/, "") === String(b || "").trim().replace(/\/+$/, "");
+
+// PATCH: edita um modelo já adicionado, mantendo o mesmo id (continua padrão e nos alvos das instruções).
+// Só o nome mudou: salva direto. Mudou a conexão (URL, token, modelo ou formato): reconhece e testa antes.
+export async function onRequestPatch({ request, env }) {
+  if (!hasStorage(env)) return noStorage();
+  const body = (await readJson(request)) || {};
+  return handle(async () => {
+    const { list, defaultId } = await loadModels(env);
+    const index = list.findIndex((m) => m.id === body.id);
+    if (index < 0) throw new ConfigError("Modelo não encontrado. Recarregue a página.");
+    const saved = list[index];
+    const label = String(body.label || "").trim().slice(0, 60);
+    const model = String(body.model || "").trim() || saved.model;
+    const format = body.format === "anthropic" || body.format === "openai" ? body.format : "auto";
+
+    const onlyLabel =
+      !String(body.token || "").trim() && (!body.url || sameURL(body.url, saved.baseURL)) && model === saved.model && format === "auto";
+    if (onlyLabel) {
+      list[index] = { ...saved, label: label || saved.model };
+    } else {
+      // Token em branco reaproveita o salvo, mas só para o mesmo endereço.
+      const { url, token } = credentials({ url: body.url, token: body.token }, saved);
+      const detected = await detectProvider({ url, token, format });
+      const built = await buildConfig(detected, { token, model, label });
+      await testConfig(built);
+      list[index] = toModel({ ...built, id: saved.id });
+    }
+    await saveModels(env, { list, defaultId });
     return json(await modelsView(env));
   });
 }

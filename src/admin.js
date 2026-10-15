@@ -28,6 +28,10 @@ const els = {
   format: $("#format"),
   modelStatus: $("#model-status"),
   modelAdd: $("#model-add"),
+  modelCancel: $("#model-cancel"),
+  modelFormTitle: $("#model-form-title"),
+  modelFormDesc: $("#model-form-desc"),
+  tokenHelp: $("#token-help"),
   toasts: $("#toasts"),
   promptForm: $("#prompt-form"),
   promptScope: $("#prompt-scope"),
@@ -64,6 +68,7 @@ const state = {
   scope: "all", // "all" ou "some"
   targets: [], // ids marcados quando scope = "some"
   names: new Map(),
+  editingId: null, // id do modelo em edição; null = adicionando
 };
 
 const esc = (text) =>
@@ -282,7 +287,7 @@ function renderModelList() {
   els.modelList.innerHTML = state.models
     .map((m) => {
       const isDefault = m.id === state.defaultId;
-      return `<div class="model-row">
+      return `<div class="model-row${m.id === state.editingId ? " editing" : ""}">
         <span class="model-mark">${icon("sparkle")}</span>
         <div class="model-info">
           <div class="model-name">${esc(modelLabel(m))}${isDefault ? `<span class="badge ok">Padrão</span>` : ""}</div>
@@ -290,6 +295,7 @@ function renderModelList() {
         </div>
         <div class="model-actions">
           ${isDefault ? "" : `<button type="button" class="btn ghost small" data-default="${esc(m.id)}">Tornar padrão</button>`}
+          <button type="button" class="icon-btn" data-edit="${esc(m.id)}" title="Editar" aria-label="Editar modelo">${icon("edit")}</button>
           <button type="button" class="icon-btn" data-remove="${esc(m.id)}" title="Remover" aria-label="Remover modelo">${icon("trash")}</button>
         </div>
       </div>`;
@@ -300,8 +306,11 @@ function renderModelList() {
 els.modelList.addEventListener("click", async (e) => {
   const def = e.target.closest("[data-default]");
   const del = e.target.closest("[data-remove]");
+  const edit = e.target.closest("[data-edit]");
   try {
-    if (def) {
+    if (edit) {
+      startEdit(edit.dataset.edit);
+    } else if (def) {
       setModelsState(await api("models", "PUT", { defaultId: def.dataset.default }));
       renderOverview();
       toast("Modelo padrão atualizado");
@@ -309,6 +318,7 @@ els.modelList.addEventListener("click", async (e) => {
       const m = state.models.find((x) => x.id === del.dataset.remove);
       if (!m || !confirm(`Remover "${modelLabel(m)}"?`)) return;
       setModelsState(await api("models", "DELETE", { id: del.dataset.remove }));
+      if (state.editingId === del.dataset.remove) resetModelForm();
       renderOverview();
       loadPrompt();
       toast("Modelo removido");
@@ -327,6 +337,55 @@ function addForm() {
     format: els.format.value,
   };
 }
+
+// ---- Editar um modelo já adicionado ----
+// O formulário de cima serve para os dois: adicionar (POST) e editar (PATCH, mesmo id).
+
+function startEdit(id) {
+  const m = state.models.find((x) => x.id === id);
+  if (!m) return;
+  state.editingId = id;
+  els.modelForm.reset();
+  els.url.value = m.baseURL || "";
+  els.model.value = m.model || "";
+  els.label.value = m.label && m.label !== m.model ? m.label : "";
+  els.format.value = "auto";
+  els.token.placeholder = m.tokenHint ? `Salvo: ${m.tokenHint}` : "sk-…";
+  els.detected.className = "detected";
+  els.detected.textContent = "";
+  setDetectedModels([]);
+  els.modelFormTitle.textContent = `Editar modelo: ${modelLabel(m)}`;
+  els.modelFormDesc.textContent = "Mude o nome, o modelo, a URL ou o token. Se mudar a conexão, o KIRA testa de novo antes de salvar.";
+  els.tokenHelp.textContent = "Deixe em branco para manter o token salvo. Se trocar a URL, cole o token de novo.";
+  els.modelAdd.textContent = "Salvar alterações";
+  els.modelCancel.hidden = false;
+  els.modelForm.classList.add("editing");
+  setStatus(els.modelStatus, "");
+  renderModelList();
+  els.modelForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  els.label.focus({ preventScroll: true });
+}
+
+function resetModelForm() {
+  state.editingId = null;
+  els.modelForm.reset();
+  els.token.placeholder = "sk-…";
+  els.detected.className = "detected";
+  els.detected.textContent = "";
+  setDetectedModels([]);
+  els.modelFormTitle.textContent = "Adicionar modelo";
+  els.modelFormDesc.textContent = "Cole a URL da API e o token. O KIRA reconhece o provedor sozinho.";
+  els.tokenHelp.textContent = "Fica guardado só no servidor e nunca é mostrado aos usuários.";
+  els.modelAdd.textContent = "Testar e adicionar";
+  els.modelCancel.hidden = true;
+  els.modelForm.classList.remove("editing");
+  renderModelList();
+}
+
+els.modelCancel.addEventListener("click", () => {
+  resetModelForm();
+  setStatus(els.modelStatus, "");
+});
 
 function setDetectedModels(models) {
   state.names = new Map(models.map((m) => [m.id, m.name]));
@@ -354,7 +413,8 @@ els.detect.addEventListener("click", async () => {
   els.detected.className = "detected";
   els.detected.textContent = "Reconhecendo…";
   try {
-    const d = await api("detect", "POST", addForm());
+    // Editando: manda o id para o servidor reaproveitar o token salvo (só no mesmo endereço).
+    const d = await api("detect", "POST", state.editingId ? { ...addForm(), id: state.editingId } : addForm());
     setDetectedModels(d.models);
     if (!els.model.value.trim() || (d.models.length && !state.names.has(els.model.value.trim()))) {
       els.model.value = d.suggested || "";
@@ -377,17 +437,22 @@ els.model.addEventListener("input", updateLabelPlaceholder);
 
 els.modelForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const editing = state.editingId;
+  if (editing && !state.models.some((m) => m.id === editing)) {
+    resetModelForm();
+    setStatus(els.modelStatus, "Esse modelo foi removido.", "error");
+    return;
+  }
   els.modelAdd.disabled = true;
-  setStatus(els.modelStatus, "Testando a conexão com a IA… pode levar alguns segundos.");
+  setStatus(els.modelStatus, editing ? "Salvando…" : "Testando a conexão com a IA… pode levar alguns segundos.");
   try {
-    setModelsState(await api("models", "POST", addForm()));
-    els.modelForm.reset();
-    els.detected.textContent = "";
-    state.names = new Map();
+    const data = editing ? await api("models", "PATCH", { ...addForm(), id: editing }) : await api("models", "POST", addForm());
+    setModelsState(data);
+    resetModelForm();
     renderOverview();
     loadPrompt();
-    setStatus(els.modelStatus, "Modelo adicionado.", "ok");
-    toast("Modelo adicionado");
+    setStatus(els.modelStatus, editing ? "Alterações salvas." : "Modelo adicionado.", "ok");
+    toast(editing ? "Modelo atualizado" : "Modelo adicionado");
   } catch (err) {
     setStatus(els.modelStatus, err.message, "error");
   } finally {

@@ -140,7 +140,12 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
 .model-sub { margin-top: 2px; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 .model-actions { display: flex; align-items: center; gap: 6px; flex: none; }
 .model-actions .icon-btn { width: 32px; height: 32px; color: var(--muted); }
-.model-actions .icon-btn:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.model-actions .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.model-actions [data-remove]:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.model-row.editing { border-color: color-mix(in srgb, var(--a2) 55%, var(--border-strong)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--a2) 14%, transparent); }
+.model-row.editing [data-edit] { background: color-mix(in srgb, var(--a2) 14%, transparent); color: var(--text); }
+#model-form { scroll-margin-top: 24px; }
+#model-form.editing { border-color: color-mix(in srgb, var(--a2) 45%, var(--border-strong)); }
 
 /* ---------- Alvos das instruções e preview ---------- */
 .targets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
@@ -208,6 +213,7 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
   .nav-app { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 8px; }
   .nav-user { padding: 0; }
   .content { padding: 24px 16px 64px; }
+  #model-form { scroll-margin-top: 112px; } /* abaixo do menu fixo do topo */
   .page-head h1 { font-size: 21px; }
 }
 
@@ -218,6 +224,8 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
   .panel-card-body { padding: 18px 16px 20px; }
   .panel-card-foot { padding: 12px 16px; }
   .panel-card-foot .btn.primary { flex: 1; }
+  .model-row { flex-wrap: wrap; }
+  .model-actions { width: 100%; justify-content: flex-end; }
   .facts { grid-template-columns: minmax(0, 1fr); }
   .facts dt { padding-bottom: 2px; }
   .facts dd { padding-top: 0; border-top: 0; }
