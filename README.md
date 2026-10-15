@@ -47,7 +47,25 @@ Na página **Instruções**, escolha a aba **Todos os modelos** (vale para todos
 
 Na seção **Cadastro e login dos usuários** do painel, informe a URL do projeto (`https://<projeto>.supabase.co`) e a **chave pública** (publishable `sb_publishable_…` ou anon), que fica na Supabase em Project Settings → API Keys. O painel testa a chave na Supabase e recusa a chave secreta (`sb_secret_…`/`service_role`). **Desligar login** volta a deixar o app aberto.
 
+A tela de login tem **Esqueci minha senha**: a Supabase manda um link que volta para o app em modo "Definir nova senha". Para os links de email (confirmar conta e recuperar senha) voltarem ao app, em Authentication → URL Configuration o **Site URL** precisa ser `https://kira-cb0.pages.dev`.
+
 Na Supabase (Authentication → Sign In / Providers), a confirmação de email vem ligada. Sem um SMTP próprio, o email padrão da Supabase só chega a membros da equipe do projeto: para receber usuários de fora, configure um SMTP (Authentication → Emails → SMTP Settings) ou desligue "Confirm email". Para voltar ao modelo gratuito, use **Remover configuração**.
+
+### Banco de dados (histórico na nuvem)
+
+Com o login ativo, a página **Banco de dados** do painel mostra um SQL para rodar uma vez no SQL Editor da Supabase (há um botão que abre o editor do projeto e outro que copia o SQL). Depois clique em **Verificar**. Rodar o SQL de novo não apaga dados.
+
+Com o banco ativo, funciona como nos assistentes grandes:
+
+- **Conversas na conta:** cada usuário vê as próprias conversas em qualquer aparelho. As conversas que estavam só no navegador vão para a conta no primeiro acesso.
+- **Contexto no servidor:** o navegador manda só a mensagem nova; o servidor remonta o histórico. Quando a conversa passa do que cabe no modelo, o começo vira um resumo (gerado pelo próprio modelo e guardado na conversa) e só as mensagens recentes vão inteiras.
+- **Personalização:** em Configurações, cada usuário diz como quer ser chamado e o que a KIRA deve saber sobre ele. Isso vale para todas as conversas dele, com prioridade só sobre o estilo padrão (nunca sobre o uso responsável nem sobre as instruções do administrador).
+- **Editar, gerar de novo e parar** ficam iguais no banco: parar guarda o que já veio, marcado como "Resposta interrompida".
+- **Limites de uso:** na página **Limites de uso**, mensagens por usuário por hora e por dia (padrão 30/h e 150/dia; 0 = sem limite). Quem passa do limite vê a hora em que pode voltar.
+
+Segurança: só o servidor do KIRA grava no banco. As políticas (Row Level Security) exigem o cabeçalho `x-kira-server` com a chave do servidor, e o banco guarda só o SHA-256 dela. O navegador consegue apenas ler os próprios dados, então ninguém forja respostas da IA no histórico (que voltam ao modelo como contexto) nem grava fora dos limites. Respostas importadas do navegador voltam ao modelo como texto citado do usuário, nunca como fala da IA. A chave fica no KV (`db-key`) ou no secret opcional `KIRA_DB_KEY`.
+
+Sem login ou sem o banco, o histórico continua só no navegador, como antes.
 
 Segurança do painel: sessão em cookie `HttpOnly`/`SameSite=Strict` assinado com HMAC (8 h), bloqueio por 15 min após 10 tentativas erradas, as rotas de escrita só aceitam requisições do próprio site e o token nunca é devolvido ao navegador (o painel mostra só os 4 últimos caracteres). Trocar o `ADMIN_USER` ou a `ADMIN_PASSWORD` encerra todas as sessões abertas. O usuário não diferencia maiúsculas de minúsculas; a senha, sim.
 

@@ -1,4 +1,5 @@
-import { apiHeaders, authClient, currentUser, describeAuthError, initAuth } from "./auth.js";
+import { apiHeaders, authClient, currentUser, describeAuthError, historyInCloud, initAuth } from "./auth.js";
+import { cloud } from "./cloud.js";
 import { hydrateIcons, icon } from "./icons.js";
 import { escapeHtml, renderMarkdown } from "./markdown.js";
 import { store, uid } from "./store.js";
@@ -31,8 +32,34 @@ const els = {
   authPassword: $("#auth-password"),
   authStatus: $("#auth-status"),
   authSubmit: $("#auth-submit"),
+  authTabs: $("#auth-tabs"),
+  authEmailWrap: $("#auth-email-wrap"),
+  authPasswordWrap: $("#auth-password-wrap"),
+  authPasswordLabel: $("#auth-password-label"),
+  authForgot: $("#auth-forgot"),
+  authBack: $("#auth-back"),
   account: $("#account"),
+  historyHint: $("#history-hint"),
+  profileSection: $("#profile-section"),
+  profileName: $("#profile-name"),
+  profileAbout: $("#profile-about"),
+  profileSave: $("#profile-save"),
+  profileHint: $("#profile-hint"),
 };
+
+// Fuso do usuário, para a KIRA saber a data certa.
+const TIMEZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+})();
+
+// Links de email da Supabase (recuperar senha, confirmar conta) chegam com dados no #hash.
+const AUTH_HASH = new URLSearchParams(location.hash.slice(1));
+const RECOVERY = AUTH_HASH.get("type") === "recovery";
+const AUTH_LINK_ERROR = AUTH_HASH.get("error_code") === "otp_expired" ? "O link expirou ou já foi usado. Peça outro." : AUTH_HASH.get("error_description");
 
 const MOBILE = matchMedia("(max-width: 820px)");
 
@@ -49,7 +76,8 @@ const state = {
   models: [{ id: "default", label: "KIRA" }],
   choice: store.getPref("model") || "",
   user: null,
-  authMode: "login",
+  authMode: "login", // login, signup, reset (pedir link) ou newpass (definir nova senha)
+  historyLoading: false,
 };
 
 // ---------------- Utilidades ----------------
@@ -145,29 +173,55 @@ els.modelPlans.addEventListener("click", (e) => {
 
 // ---------------- Barra lateral ----------------
 
+// Grupos por data, como nos apps de chat.
+function dayGroup(time) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(time);
+  day.setHours(0, 0, 0, 0);
+  const days = Math.round((today - day) / 86_400_000);
+  if (days <= 0) return "Hoje";
+  if (days === 1) return "Ontem";
+  if (days < 7) return "Últimos 7 dias";
+  if (days < 30) return "Últimos 30 dias";
+  return "Mais antigas";
+}
+
 function renderHistory() {
-  const chats = store.chats.filter((c) => c.messages.length).sort((a, b) => b.updatedAt - a.updatedAt);
+  // Na nuvem, conversas ainda não abertas aparecem mesmo sem as mensagens carregadas.
+  const chats = store.chats.filter((c) => c.messages.length || !c.loaded).sort((a, b) => b.updatedAt - a.updatedAt);
   if (!chats.length) {
-    els.history.innerHTML = `<p class="history-empty">Nenhuma conversa ainda.</p>`;
+    els.history.innerHTML = `<p class="history-empty">${state.historyLoading ? "Carregando conversas…" : "Nenhuma conversa ainda."}</p>`;
     return;
   }
+  let group = "";
   els.history.innerHTML = chats
-    .map(
-      (c) => `<div class="h-item ${c.id === state.chatId ? "active" : ""} ${state.streaming?.chatId === c.id ? "live" : ""}">
+    .map((c) => {
+      const g = dayGroup(c.updatedAt);
+      const head = g !== group ? `<p class="h-group sb-text">${g}</p>` : "";
+      group = g;
+      return `${head}<div class="h-item ${c.id === state.chatId ? "active" : ""} ${state.streaming?.chatId === c.id ? "live" : ""}">
         <button class="h-open" data-open="${c.id}" title="${escapeHtml(c.title)}">${escapeHtml(c.title)}</button>
         <button class="h-del" data-delete="${c.id}" title="Apagar" aria-label="Apagar conversa">${icon("trash")}</button>
-      </div>`,
-    )
+      </div>`;
+    })
     .join("");
 }
 
-els.history.addEventListener("click", (e) => {
+els.history.addEventListener("click", async (e) => {
   const del = e.target.closest("[data-delete]");
   const open = e.target.closest("[data-open]");
   if (del) {
     const chat = store.getChat(del.dataset.delete);
     if (!chat || !confirm(`Apagar "${chat.title}"?`)) return;
     if (state.streaming?.chatId === chat.id) state.streaming.controller.abort();
+    if (store.cloud && !chat.isNew) {
+      try {
+        await cloud.remove(chat.id);
+      } catch (err) {
+        if (err.status !== 404) return toast(err.message, "error");
+      }
+    }
     store.deleteChat(chat.id);
     if (state.chatId === chat.id) newChat();
     renderHistory();
@@ -207,17 +261,45 @@ function newChat() {
   if (!MOBILE.matches) els.input.focus();
 }
 
-function openChat(id) {
+async function openChat(id) {
   const chat = store.getChat(id);
   if (!chat) return newChat();
   state.chatId = id;
   els.chatTitle.textContent = chat.title;
+  history.replaceState(null, "", `#${id}`);
+  renderHistory();
+  if (!chat.loaded) {
+    els.app.classList.remove("is-empty");
+    els.messages.innerHTML = `<div class="chat-loading"><span class="shimmer">Carregando conversa…</span></div>`;
+    try {
+      await loadChat(chat);
+    } catch (err) {
+      if (state.chatId !== id) return;
+      if (err.status === 404) {
+        store.deleteChat(id);
+        toast("Esta conversa não existe mais.", "error");
+        return newChat();
+      }
+      els.messages.innerHTML = `<div class="notice error">${icon("warn")}<span>${escapeHtml(err.message)}</span></div>`;
+      return;
+    }
+    if (state.chatId !== id) return; // abriu outra conversa enquanto carregava
+    els.chatTitle.textContent = chat.title;
+  }
   els.app.classList.toggle("is-empty", !chat.messages.length);
   els.messages.innerHTML = "";
   chat.messages.forEach((m) => els.messages.appendChild(renderMessage(m)));
-  renderHistory();
   scrollToBottom(true);
-  history.replaceState(null, "", `#${id}`);
+}
+
+// Nuvem: busca as mensagens da conversa na conta.
+async function loadChat(chat) {
+  const data = await cloud.load(chat.id);
+  chat.messages = data.messages;
+  chat.title = data.title;
+  chat.updatedAt = Math.max(chat.updatedAt || 0, data.updatedAt);
+  chat.loaded = true;
+  chat.isNew = false;
 }
 
 function ensureChat() {
@@ -230,15 +312,25 @@ function ensureChat() {
   return chat;
 }
 
-els.chatTitle.addEventListener("click", () => {
+function setTitle(chat, title) {
+  chat.title = title;
+  if (state.chatId === chat.id) els.chatTitle.textContent = title;
+  renderHistory();
+}
+
+els.chatTitle.addEventListener("click", async () => {
   const chat = currentChat();
   if (!chat?.messages.length) return;
-  const title = prompt("Nome da conversa:", chat.title);
-  if (title?.trim()) {
-    chat.title = title.trim().slice(0, 80);
-    els.chatTitle.textContent = chat.title;
-    persist();
-    renderHistory();
+  const title = prompt("Nome da conversa:", chat.title)?.trim().slice(0, 80);
+  if (!title || title === chat.title) return;
+  const old = chat.title;
+  setTitle(chat, title);
+  if (!store.cloud || chat.isNew) return persist();
+  try {
+    await cloud.rename(chat.id, title);
+  } catch (err) {
+    setTitle(chat, old);
+    toast(err.message, "error");
   }
 });
 
@@ -311,7 +403,9 @@ function updateAssistant(el, msg) {
   // Conteúdo
   const content = el.querySelector(".content");
   if (msg.content) content.innerHTML = renderMarkdown(msg.content);
-  else if (live && !msg.thinking) content.innerHTML = `<div class="pending"><span class="shimmer">Pensando…</span></div>`;
+  else if (live && !msg.thinking) {
+    content.innerHTML = `<div class="pending"><span class="shimmer">${escapeHtml(msg.statusText || "Pensando…")}</span></div>`;
+  }
   else content.innerHTML = "";
 
   el.querySelector(".notices").innerHTML = [
@@ -355,7 +449,7 @@ els.messages.addEventListener("click", async (e) => {
     chat.messages.splice(chat.messages.indexOf(msg));
     while (msgEl.nextElementSibling) msgEl.nextElementSibling.remove();
     msgEl.remove();
-    runAssistant(chat);
+    runAssistant(chat, { regenerate: true, fromMessageId: msg.id });
   } else if (act.dataset.act === "edit") {
     startEdit(msgEl, msg, chat);
   }
@@ -383,14 +477,21 @@ function startEdit(msgEl, msg, chat) {
     chat.messages.splice(chat.messages.indexOf(msg));
     while (msgEl.nextElementSibling) msgEl.nextElementSibling.remove();
     msgEl.remove();
-    sendMessage(text);
+    sendMessage(text, { editOf: msg.id });
   });
 }
 
 // ---------------- Envio e streaming ----------------
 
-async function sendMessage(text) {
+const provisionalTitle = (text) => {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.slice(0, 48) + (clean.length > 48 ? "…" : "");
+};
+
+// editOf: id da mensagem do usuário que foi editada (ela e o que vinha depois são substituídos).
+async function sendMessage(text, { editOf = null } = {}) {
   if (state.streaming) return;
+  if (currentChat() && !currentChat().loaded) return toast("Aguarde a conversa carregar.");
   const chat = ensureChat();
   const userMsg = { id: uid(), role: "user", content: text, createdAt: Date.now() };
   chat.messages.push(userMsg);
@@ -398,13 +499,30 @@ async function sendMessage(text) {
   els.app.classList.remove("is-empty");
   els.messages.appendChild(renderMessage(userMsg));
   scrollToBottom(true);
-  if (chat.messages.length === 1) generateTitle(chat, text);
-  await runAssistant(chat);
+  if (chat.messages.length === 1) {
+    setTitle(chat, provisionalTitle(text));
+    if (!store.cloud) generateTitle(chat, text); // na nuvem o servidor manda o título
+  }
+  await runAssistant(chat, { content: text, userMessageId: userMsg.id, editOf });
 }
 
-async function runAssistant(chat) {
+// op: { content, userMessageId, editOf } para mensagem nova, ou { regenerate, fromMessageId } para gerar de novo.
+async function runAssistant(chat, op) {
   const msg = { id: uid(), role: "assistant", content: "", thinking: "", notices: [], createdAt: Date.now() };
-  const payload = { model: currentModel().id, messages: chat.messages.map(({ role, content }) => ({ role, content })) };
+  const base = { model: currentModel().id, timezone: TIMEZONE };
+  // Nuvem: o servidor guarda o histórico e monta o contexto; vai só a mensagem nova.
+  // Local: o histórico deste navegador vai inteiro a cada mensagem.
+  const payload = store.cloud
+    ? {
+        ...base,
+        conversationId: chat.id,
+        newConversation: Boolean(chat.isNew),
+        assistantMessageId: msg.id,
+        ...(op.regenerate
+          ? { regenerate: true, fromMessageId: op.fromMessageId }
+          : { content: op.content, userMessageId: op.userMessageId, editMessageId: op.editOf || undefined }),
+      }
+    : { ...base, messages: chat.messages.map(({ role, content }) => ({ role, content })) };
   const controller = new AbortController();
   state.streaming = { controller, chatId: chat.id, msgId: msg.id };
   chat.messages.push(msg);
@@ -428,6 +546,7 @@ async function runAssistant(chat) {
   };
 
   let thinkStart = 0;
+  let rejected = null;
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
@@ -436,16 +555,17 @@ async function runAssistant(chat) {
       signal: controller.signal,
     });
     if (!res.ok) {
-      let err = `Erro HTTP ${res.status}`;
       let data = {};
       try {
         data = await res.json();
-        err = data.error || err;
       } catch {
         // resposta sem JSON
       }
       if (res.status === 401 && data.auth) showAuth("Sua sessão expirou. Entre de novo para continuar.");
-      throw new Error(err);
+      const error = new Error(data.error || `Erro HTTP ${res.status}`);
+      // Na nuvem, uma recusa antes do streaming significa que o servidor não guardou nada.
+      if (store.cloud) Object.assign(error, { rejected: true, status: res.status, data });
+      throw error;
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -467,11 +587,18 @@ async function runAssistant(chat) {
         }
         if (ev.type === "meta") {
           msg.modelLabel = ev.label;
+          chat.isNew = false;
+        } else if (ev.type === "title") {
+          setTitle(chat, ev.title);
+        } else if (ev.type === "status") {
+          msg.statusText = ev.text;
         } else if (ev.type === "thinking") {
           if (!thinkStart) thinkStart = Date.now();
+          msg.statusText = "";
           msg.thinking += ev.text;
         } else if (ev.type === "text") {
           if (thinkStart && !msg.thinkingMs) msg.thinkingMs = Date.now() - thinkStart;
+          msg.statusText = "";
           msg.content += ev.text;
         } else if (ev.type === "notice") msg.notices.push(ev.text);
         else if (ev.type === "error") msg.error = ev.message;
@@ -480,6 +607,7 @@ async function runAssistant(chat) {
     }
   } catch (err) {
     if (err.name === "AbortError") msg.stopped = true;
+    else if (err.rejected) rejected = err;
     else msg.error = err.message || "Falha de conexão.";
   } finally {
     if (thinkStart && !msg.thinkingMs) msg.thinkingMs = Date.now() - thinkStart;
@@ -491,20 +619,47 @@ async function runAssistant(chat) {
     persist();
     renderHistory();
   }
+  if (rejected) await undoRejected(chat, op, rejected);
 }
 
+function whenText(iso) {
+  const t = new Date(iso);
+  const hm = t.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return t.toDateString() === new Date().toDateString() ? `às ${hm}` : `amanhã às ${hm}`;
+}
+
+// Nuvem: o servidor recusou (limite, conversa apagada, banco fora do ar…) sem guardar nada.
+// Desfaz na tela, volta o texto para o campo e recarrega a conversa como ela está na conta.
+async function undoRejected(chat, op, err) {
+  const data = err.data || {};
+  if (op.content && !els.input.value.trim()) {
+    els.input.value = op.content;
+    autosize(els.input);
+    updateSend();
+  }
+  if (err.status !== 401) toast(data.limit && data.retryAt ? `${err.message} Tente de novo ${whenText(data.retryAt)}.` : err.message, "error");
+  if (chat.isNew || data.gone) {
+    store.deleteChat(chat.id);
+    if (state.chatId === chat.id) newChat();
+    else renderHistory();
+    return;
+  }
+  try {
+    await loadChat(chat);
+  } catch {
+    // mantém o que está na tela
+  }
+  if (state.chatId === chat.id) openChat(chat.id);
+}
+
+// Histórico local: título curto gerado pelo servidor.
 async function generateTitle(chat, text) {
-  chat.title = text.replace(/\s+/g, " ").slice(0, 48) + (text.length > 48 ? "…" : "");
-  if (state.chatId === chat.id) els.chatTitle.textContent = chat.title;
-  renderHistory();
   try {
     const res = await fetch("/api/title", { method: "POST", headers: await apiHeaders(), body: JSON.stringify({ text }) });
     const { title } = await res.json();
     if (title) {
-      chat.title = title;
-      if (state.chatId === chat.id) els.chatTitle.textContent = title;
+      setTitle(chat, title);
       persist();
-      renderHistory();
     }
   } catch {
     // mantém o título provisório
@@ -589,18 +744,65 @@ els.toBottom.addEventListener("click", () => {
 function openSettings() {
   loadEngine();
   renderAccount();
+  els.historyHint.textContent = store.cloud
+    ? "Suas conversas ficam salvas na sua conta e aparecem em qualquer aparelho em que você entrar."
+    : "O histórico fica salvo só neste navegador.";
+  els.profileSection.hidden = !store.cloud;
   els.settings.showModal();
   closeDrawer();
+  if (store.cloud) loadProfile();
 }
+
+// ---------------- Personalização ----------------
+
+function setProfileHint(text, kind = "") {
+  els.profileHint.textContent = text;
+  els.profileHint.className = `hint ${kind}`;
+}
+
+async function loadProfile() {
+  setProfileHint("Vale para todas as suas conversas.");
+  try {
+    const profile = await cloud.profile();
+    els.profileName.value = profile.name || "";
+    els.profileAbout.value = profile.about || "";
+  } catch (err) {
+    setProfileHint(err.message, "error");
+  }
+}
+
+els.profileSave.addEventListener("click", async () => {
+  els.profileSave.disabled = true;
+  setProfileHint("Salvando…");
+  try {
+    const profile = await cloud.saveProfile({ name: els.profileName.value, about: els.profileAbout.value });
+    els.profileName.value = profile.name || "";
+    els.profileAbout.value = profile.about || "";
+    setProfileHint("Salvo. Vale a partir da próxima mensagem.", "ok");
+  } catch (err) {
+    setProfileHint(err.message, "error");
+  } finally {
+    els.profileSave.disabled = false;
+  }
+});
 
 $("#open-settings").addEventListener("click", openSettings);
 $("#engine-btn").addEventListener("click", openSettings);
 
-$("#clear-all").addEventListener("click", () => {
-  if (!confirm("Apagar todas as conversas deste navegador?")) return;
+$("#clear-all").addEventListener("click", async () => {
+  const question = store.cloud
+    ? "Apagar todas as suas conversas? Elas somem da sua conta em todos os aparelhos."
+    : "Apagar todas as conversas deste navegador?";
+  if (!confirm(question)) return;
   state.streaming?.controller.abort();
-  store.chats = [];
-  store.saveChats();
+  if (store.cloud) {
+    try {
+      await cloud.removeAll();
+    } catch (err) {
+      return toast(err.message, "error");
+    }
+  }
+  store.clear();
   els.settings.close();
   newChat();
 });
@@ -616,18 +818,31 @@ function setAuthStatus(text, kind = "") {
   els.authStatus.className = `key-status ${kind}`;
 }
 
+const AUTH_MODES = {
+  login: { title: "Entrar no KIRA", submit: "Entrar", status: "" },
+  signup: { title: "Criar conta no KIRA", submit: "Criar conta", status: "A senha precisa ter pelo menos 8 caracteres." },
+  reset: { title: "Recuperar senha", submit: "Enviar link", status: "Enviaremos um link para você criar uma nova senha." },
+  newpass: { title: "Definir nova senha", submit: "Salvar nova senha", status: "A senha precisa ter pelo menos 8 caracteres." },
+};
+
 function setAuthMode(mode) {
   state.authMode = mode;
-  const signup = mode === "signup";
+  const conf = AUTH_MODES[mode];
   els.auth.querySelectorAll("[data-mode]").forEach((b) => {
     b.classList.toggle("active", b.dataset.mode === mode);
     b.setAttribute("aria-selected", String(b.dataset.mode === mode));
   });
-  $("#auth-name-wrap").hidden = !signup;
-  els.authTitle.textContent = signup ? "Criar conta no KIRA" : "Entrar no KIRA";
-  els.authSubmit.textContent = signup ? "Criar conta" : "Entrar";
-  els.authPassword.autocomplete = signup ? "new-password" : "current-password";
-  setAuthStatus(signup ? "A senha precisa ter pelo menos 8 caracteres." : "");
+  els.authTabs.hidden = mode === "reset" || mode === "newpass";
+  $("#auth-name-wrap").hidden = mode !== "signup";
+  els.authEmailWrap.hidden = mode === "newpass";
+  els.authPasswordWrap.hidden = mode === "reset";
+  els.authForgot.hidden = mode !== "login";
+  els.authBack.hidden = mode !== "reset";
+  els.authTitle.textContent = conf.title;
+  els.authSubmit.textContent = conf.submit;
+  els.authPasswordLabel.textContent = mode === "newpass" ? "Nova senha" : "Senha";
+  els.authPassword.autocomplete = mode === "signup" || mode === "newpass" ? "new-password" : "current-password";
+  setAuthStatus(conf.status);
 }
 
 function showAuth(message = "") {
@@ -651,15 +866,51 @@ function renderAccount() {
   $("#account-name").textContent = user.user_metadata?.name || "Conectado";
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Abre o app para a conta atual (ou sem conta, quando o login está desligado).
-function enterApp(user) {
+async function enterApp(user) {
   state.user = user;
-  store.useAccount(user?.id ?? null);
+  store.useAccount(user?.id ?? null, Boolean(user) && historyInCloud());
   els.auth.hidden = true;
   document.body.classList.remove("booting");
   const fromHash = location.hash.slice(1);
-  if (fromHash && store.getChat(fromHash)?.messages.length) openChat(fromHash);
-  else newChat();
+  if (!store.cloud) {
+    if (fromHash && store.getChat(fromHash)?.messages.length) openChat(fromHash);
+    else newChat();
+    return;
+  }
+  // Nuvem: abre a conversa do link (se houver) enquanto a lista carrega.
+  if (UUID.test(fromHash)) {
+    store.chats = [{ id: fromHash, title: "", messages: [], loaded: false, createdAt: 0, updatedAt: 0 }];
+    openChat(fromHash);
+  } else {
+    newChat();
+  }
+  await syncHistory();
+}
+
+// Nuvem: leva para a conta as conversas que estavam só neste navegador e carrega a lista.
+async function syncHistory() {
+  state.historyLoading = true;
+  renderHistory();
+  const pending = store.pendingLocal();
+  if (pending.length) {
+    const result = await cloud.importLocal(pending);
+    if (result.done.length) store.forgetLocal(result.done);
+    if (result.imported) {
+      toast(result.imported === 1 ? "1 conversa deste navegador foi salva na sua conta." : `${result.imported} conversas deste navegador foram salvas na sua conta.`);
+    }
+  }
+  try {
+    store.setRemote(await cloud.list());
+  } catch (err) {
+    toast(`Não foi possível carregar suas conversas: ${err.message}`, "error");
+  }
+  state.historyLoading = false;
+  renderHistory();
+  const chat = currentChat();
+  if (chat?.title) els.chatTitle.textContent = chat.title;
 }
 
 els.auth.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setAuthMode(b.dataset.mode)));
@@ -676,7 +927,10 @@ els.authForm.addEventListener("submit", async (e) => {
   const client = authClient();
   const email = els.authEmail.value.trim();
   const password = els.authPassword.value;
-  const signup = state.authMode === "signup";
+  const mode = state.authMode;
+  const signup = mode === "signup";
+  if (mode === "reset") return requestReset(client, email);
+  if (mode === "newpass") return saveNewPassword(client, password);
   if (!email || !password) return setAuthStatus("Preencha o email e a senha.", "error");
   if (signup && password.length < 8) return setAuthStatus("A senha precisa ter pelo menos 8 caracteres.", "error");
 
@@ -706,12 +960,52 @@ els.authForm.addEventListener("submit", async (e) => {
   }
 });
 
+// Recuperar senha: a Supabase manda um link que volta para o app em modo "nova senha".
+async function requestReset(client, email) {
+  if (!email) return setAuthStatus("Informe o seu email.", "error");
+  els.authSubmit.disabled = true;
+  setAuthStatus("Enviando…");
+  try {
+    const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/` });
+    if (error) throw error;
+    setAuthStatus("Se houver uma conta com este email, enviamos um link para criar uma nova senha. Confira também o spam.", "ok");
+  } catch (err) {
+    setAuthStatus(describeAuthError(err), "error");
+  } finally {
+    els.authSubmit.disabled = false;
+  }
+}
+
+async function saveNewPassword(client, password) {
+  if (password.length < 8) return setAuthStatus("A senha precisa ter pelo menos 8 caracteres.", "error");
+  els.authSubmit.disabled = true;
+  setAuthStatus("Salvando…");
+  try {
+    const { data, error } = await client.auth.updateUser({ password });
+    if (error) throw error;
+    els.authPassword.value = "";
+    toast("Senha alterada.");
+    enterApp(data.user);
+  } catch (err) {
+    setAuthStatus(describeAuthError(err), "error");
+  } finally {
+    els.authSubmit.disabled = false;
+  }
+}
+
+els.authForgot.addEventListener("click", () => {
+  setAuthMode("reset");
+  els.authEmail.focus();
+});
+els.authBack.addEventListener("click", () => setAuthMode("login"));
+
 $("#sign-out").addEventListener("click", async () => {
   state.streaming?.controller.abort();
   els.settings.close();
   await authClient()?.auth.signOut();
   state.user = null;
   store.chats = [];
+  store.cloud = false;
   els.messages.innerHTML = "";
   renderHistory();
   setAuthMode("login");
@@ -743,8 +1037,14 @@ loadEngine();
 (async () => {
   const client = await initAuth();
   if (!client) return enterApp(null);
-  const user = await currentUser();
+  const user = await currentUser(); // espera o login ler a sessão do link de email, se houver
+  // Tira do endereço os dados do link de email.
+  if (AUTH_HASH.has("type") || AUTH_HASH.has("error")) history.replaceState(null, "", location.pathname);
+  if (user && RECOVERY) {
+    setAuthMode("newpass");
+    return showAuth();
+  }
   if (user) return enterApp(user);
   setAuthMode("login");
-  showAuth();
+  showAuth(AUTH_LINK_ERROR || "");
 })();

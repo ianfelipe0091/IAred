@@ -199,6 +199,8 @@ body.admin-page { overflow: auto; font-size: 14px; background: var(--bg); }
 .steps li::marker { color: var(--muted); }
 .steps code { display: block; margin-top: 8px; padding: 10px 12px; border-radius: 9px; background: var(--code-bg); color: var(--code-text); font: 12.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .steps small { display: block; margin-top: 6px; color: var(--muted); }
+.steps .inline-actions { margin-top: 8px; }
+.btn [data-icon] svg, .btn > span svg { width: 15px; height: 15px; }
 
 /* ---------- Telas menores: menu vira uma barra no topo ---------- */
 @media (max-width: 900px) {

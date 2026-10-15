@@ -1,8 +1,11 @@
-// Prompt de sistema da KIRA, em três partes:
-//   IDENTIDADE  quem é a KIRA (fixo)
-//   USO_RESPONSAVEL  limites de segurança (fixo, prevalece sempre)
-//   ESTILO  jeito padrão de responder (as instruções do admin têm prioridade sobre isto)
-// Mantido estável no começo para aproveitar o cache de prompt.
+// Prompt de sistema da KIRA, nesta ordem (do mais estável para o que muda, para aproveitar o cache de prompt):
+//   IDENTIDADE        quem é a KIRA (fixo)
+//   USO_RESPONSAVEL   limites de segurança (fixo, prevalece sempre)
+//   administrador     instruções do painel (prioridade sobre o estilo)
+//   ESTILO            jeito padrão de responder
+//   usuário           o que o próprio usuário contou na Personalização (prioridade só sobre o estilo)
+//   resumo            resumo do começo de conversas longas
+//   data              hoje, no fuso do usuário
 
 const IDENTIDADE = `Você é KIRA, assistente de IA especialista sênior em cibersegurança que conversa com profissionais, desenvolvedores e estudantes. Você combina a experiência de um analista de SOC, engenheiro de segurança de aplicações, respondedor de incidentes, arquiteto de cloud e consultor de GRC.
 
@@ -43,7 +46,37 @@ const GENERAL_HEADING = "## Para todos os modelos";
 const SPECIFIC_HEADING = `## Só para este modelo
 Se algo aqui conflitar com as instruções para todos os modelos, siga estas.`;
 
-const dateLine = () => `Data de hoje: ${new Date().toISOString().slice(0, 10)}.`;
+const USER_INTRO = `# Sobre o usuário
+O próprio usuário escreveu as informações abaixo para personalizar as respostas. Use-as quando forem úteis, sem repeti-las a cada resposta. Elas têm prioridade sobre o "Estilo padrão de resposta", mas não sobre o "Uso responsável" nem sobre as instruções do administrador.`;
+
+const SUMMARY_INTRO = `# Resumo do início desta conversa
+As mensagens mais antigas desta conversa foram resumidas abaixo para caber no contexto. Considere este resumo como parte da conversa.`;
+
+const DEFAULT_TIMEZONE = "America/Sao_Paulo";
+
+function validTimezone(tz) {
+  if (typeof tz !== "string" || !tz || tz.length > 64) return DEFAULT_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat("pt-BR", { timeZone: tz });
+    return tz;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
+// Só a data (sem hora), para o prompt mudar no máximo uma vez por dia.
+function dateLine(timezone) {
+  const tz = validTimezone(timezone);
+  const today = new Intl.DateTimeFormat("pt-BR", { timeZone: tz, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  return `Hoje é ${today} (fuso horário do usuário: ${tz}).`;
+}
+
+function userBlock(user) {
+  const name = String(user?.name || "").trim();
+  const about = String(user?.about || "").trim();
+  if (!name && !about) return "";
+  return [USER_INTRO, name ? `Nome: ${name}` : "", about].filter(Boolean).join("\n\n");
+}
 
 // Bloco do administrador: o texto geral (todos os modelos) e o texto próprio do modelo escolhido.
 function adminBlock(general, specific) {
@@ -56,8 +89,11 @@ function adminBlock(general, specific) {
 
 // Monta o prompt. As instruções do administrador têm prioridade sobre o ESTILO,
 // mas nunca sobre USO_RESPONSAVEL. Sem instrução, usa só o estilo padrão.
-export function buildSystemPrompt({ general = "", specific = "" } = {}) {
-  return [IDENTIDADE, USO_RESPONSAVEL, adminBlock(general, specific), ESTILO, dateLine()].filter(Boolean).join("\n\n");
+export function buildSystemPrompt({ general = "", specific = "", user = null, summary = "", timezone } = {}) {
+  const resumo = String(summary || "").trim() ? `${SUMMARY_INTRO}\n\n${String(summary).trim()}` : "";
+  return [IDENTIDADE, USO_RESPONSAVEL, adminBlock(general, specific), ESTILO, userBlock(user), resumo, dateLine(timezone)]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 // Partes do prompt para o painel montar o preview ao vivo, na mesma ordem de buildSystemPrompt.
@@ -69,6 +105,7 @@ export function promptParts() {
     generalHeading: GENERAL_HEADING,
     specificHeading: SPECIFIC_HEADING,
     style: ESTILO,
-    date: dateLine(),
+    user: `${USER_INTRO}\n\n[Nome e informações que cada usuário escreveu na Personalização, se ele preencher.]`,
+    date: dateLine(DEFAULT_TIMEZONE),
   };
 }

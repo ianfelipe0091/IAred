@@ -50,6 +50,20 @@ const els = {
   sbStatus: $("#sb-status"),
   sbSave: $("#sb-save"),
   sbRemove: $("#sb-remove"),
+  dbState: $("#db-state"),
+  dbSteps: $("#db-steps"),
+  dbEditor: $("#db-editor"),
+  dbCopy: $("#db-copy"),
+  dbSqlBox: $("#db-sql-box"),
+  dbSql: $("#db-sql"),
+  dbStatus: $("#db-status"),
+  dbCheck: $("#db-check"),
+  limitsForm: $("#limits-form"),
+  limitsState: $("#limits-state"),
+  limitHour: $("#limit-hour"),
+  limitDay: $("#limit-day"),
+  limitsStatus: $("#limits-status"),
+  limitsSave: $("#limits-save"),
 };
 
 const FORMAT_LABEL = { anthropic: "API da Anthropic", openai: "compatível com OpenAI" };
@@ -59,12 +73,16 @@ const PAGES = {
   modelos: { title: "Modelos", desc: "Conecte um ou mais modelos. Os usuários escolhem entre eles no app." },
   instrucoes: { title: "Instruções", desc: "Personalize o comportamento do modelo nas conversas." },
   usuarios: { title: "Login dos usuários", desc: "Cadastro e login com a Supabase." },
+  banco: { title: "Banco de dados", desc: "Conversas salvas na conta de cada usuário, em qualquer aparelho." },
+  limites: { title: "Limites de uso", desc: "Quantas mensagens cada usuário pode enviar." },
 };
 
 const state = {
   models: [], // modelos salvos (sem token)
   defaultId: null,
   auth: null,
+  db: null,
+  limits: null,
   promptData: null, // { all: { instructions, updatedAt }, models: [{ id, label, instructions, updatedAt }] }
   scope: "all", // instruções em edição: "all" (todos os modelos) ou o id de um modelo
   names: new Map(),
@@ -210,6 +228,8 @@ function renderOverview() {
   const count = state.models.length;
   const def = state.models.find((m) => m.id === state.defaultId) || state.models[0];
   const a = state.auth;
+  const db = state.db;
+  const dbReady = db?.state === "ready";
   const general = savedText("all");
   const own = (state.promptData?.models || []).filter((m) => m.instructions && state.models.some((x) => x.id === m.id));
   const hasPrompt = Boolean(general || own.length);
@@ -248,11 +268,21 @@ function renderOverview() {
       meta: a?.enabled ? a.url : "Ative para exigir conta no KIRA.",
       mono: Boolean(a?.enabled),
     }),
+    stat({
+      page: "banco",
+      iconName: "database",
+      title: "Banco de dados",
+      badge: dbReady ? { kind: "ok", text: "Ativo" } : { kind: "warn", text: DB_BADGE[db?.state] || "Inativo" },
+      value: dbReady ? "Histórico na conta de cada usuário" : "Histórico só no navegador",
+      meta: dbReady ? `Limites: ${limitsText(state.limits)}.` : DB_TEXT[db?.state] || "Carregando…",
+    }),
   ].join("");
 
   $("#dot-modelos").classList.toggle("ok", count > 0);
   $("#dot-instrucoes").classList.toggle("ok", hasPrompt);
   $("#dot-usuarios").classList.toggle("ok", Boolean(a?.enabled));
+  $("#dot-banco").classList.toggle("ok", dbReady);
+  $("#dot-limites").classList.toggle("ok", Boolean(state.limits && (state.limits.perHour || state.limits.perDay)));
 }
 
 // ---------------- Painel ----------------
@@ -268,7 +298,7 @@ async function showPanel(user) {
   renderPage();
   show("panel");
   els.modelList.innerHTML = `<p class="help">Carregando…</p>`;
-  const [models] = await Promise.allSettled([api("models"), loadUserAuth(), loadPrompt()]);
+  const [models] = await Promise.allSettled([api("models"), loadUserAuth(), loadPrompt(), loadDatabase(), loadLimits()]);
   if (models.status === "rejected") {
     els.modelList.innerHTML = `<p class="key-status error">${esc(models.reason.message)}</p>`;
     return;
@@ -554,7 +584,7 @@ function updatePreview() {
   const general = state.scope === "all" ? draft : savedText("all").trim();
   const specific = state.scope === "all" ? "" : draft;
   const body = general && specific ? `${p.generalHeading}\n\n${general}\n\n${p.specificHeading}\n\n${specific}` : general || specific;
-  const blocks = [p.identity, p.responsible, body ? `${p.intro}\n\n${body}` : "", p.style, p.date].filter(Boolean);
+  const blocks = [p.identity, p.responsible, body ? `${p.intro}\n\n${body}` : "", p.style, p.user, p.date].filter(Boolean);
   els.promptPreview.textContent = blocks.join("\n\n");
 }
 
@@ -687,6 +717,103 @@ els.sbRemove.addEventListener("click", async () => {
     setStatus(els.sbStatus, "Login desligado.");
   } catch (err) {
     setStatus(els.sbStatus, err.message, "error");
+  }
+});
+
+// ---------------- Banco de dados ----------------
+
+const DB_BADGE = { off: "Precisa do login", missing: "Falta criar", outdated: "Atualizar", key: "Rodar o SQL", error: "Erro" };
+const DB_TEXT = {
+  off: "Ative primeiro o login dos usuários (Supabase): o banco é o mesmo projeto.",
+  missing: "Falta criar as tabelas: siga os 3 passos abaixo (leva 1 minuto).",
+  outdated: "O KIRA ganhou novidades no banco: rode o SQL de novo (não apaga dados).",
+  key: "A chave do servidor não confere com o banco: rode o SQL de novo (não apaga dados).",
+  error: "Não foi possível falar com a Supabase.",
+};
+
+function renderDatabase(db) {
+  state.db = db;
+  const ready = db.state === "ready";
+  els.dbState.innerHTML = ready
+    ? `<span class="badge ok">Ativo</span><span>As conversas ficam salvas na conta de cada usuário.</span>`
+    : `<span class="badge warn">${esc(DB_BADGE[db.state] || "Inativo")}</span><span>${esc(db.message || DB_TEXT[db.state] || "")}</span>`;
+  const needsSql = ["missing", "outdated", "key"].includes(db.state);
+  els.dbSteps.hidden = !needsSql;
+  els.dbSqlBox.hidden = !db.sql;
+  els.dbSql.textContent = db.sql || "";
+  if (db.sqlEditorUrl) els.dbEditor.href = db.sqlEditorUrl;
+  els.dbEditor.hidden = !db.sqlEditorUrl;
+  els.dbCheck.hidden = db.state === "off";
+  if (state.limits) renderLimits(state.limits); // o aviso dos limites depende do banco
+}
+
+async function loadDatabase(fresh = false) {
+  try {
+    renderDatabase(await api("database", fresh ? "POST" : "GET"));
+  } catch (err) {
+    setStatus(els.dbStatus, err.message, "error");
+  }
+}
+
+els.dbCheck.addEventListener("click", async () => {
+  els.dbCheck.disabled = true;
+  setStatus(els.dbStatus, "Verificando…");
+  await loadDatabase(true);
+  renderOverview();
+  const ready = state.db?.state === "ready";
+  setStatus(els.dbStatus, ready ? "Tudo certo: o histórico na nuvem está ativo." : "Ainda não está pronto.", ready ? "ok" : "error");
+  if (ready) toast("Banco de dados ativo");
+  els.dbCheck.disabled = false;
+});
+
+els.dbCopy.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(els.dbSql.textContent);
+    toast("SQL copiado");
+  } catch {
+    els.dbSqlBox.open = true;
+    toast("Não deu para copiar: selecione o texto do SQL.", "error");
+  }
+});
+
+// ---------------- Limites de uso ----------------
+
+const limitsText = (l) => {
+  if (!l) return "—";
+  const parts = [l.perHour ? `${fmtNumber(l.perHour)}/hora` : "", l.perDay ? `${fmtNumber(l.perDay)}/dia` : ""].filter(Boolean);
+  return parts.length ? parts.join(" e ") : "sem limite";
+};
+
+function renderLimits(limits) {
+  state.limits = limits;
+  els.limitHour.value = limits.perHour;
+  els.limitDay.value = limits.perDay;
+  els.limitsState.innerHTML =
+    state.db && state.db.state !== "ready"
+      ? `<span class="badge warn">Sem efeito ainda</span><span>Os limites passam a valer quando o banco de dados estiver ativo.</span>`
+      : "";
+}
+
+async function loadLimits() {
+  try {
+    renderLimits(await api("limits"));
+  } catch (err) {
+    setStatus(els.limitsStatus, err.message, "error");
+  }
+}
+
+els.limitsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  els.limitsSave.disabled = true;
+  try {
+    renderLimits(await api("limits", "PUT", { perHour: Number(els.limitHour.value || 0), perDay: Number(els.limitDay.value || 0) }));
+    renderOverview();
+    setStatus(els.limitsStatus, `Salvo: ${limitsText(state.limits)} por usuário.`, "ok");
+    toast("Limites salvos");
+  } catch (err) {
+    setStatus(els.limitsStatus, err.message, "error");
+  } finally {
+    els.limitsSave.disabled = false;
   }
 });
 

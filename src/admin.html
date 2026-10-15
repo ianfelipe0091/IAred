@@ -72,6 +72,8 @@
         <a class="nav-item" href="#instrucoes" data-nav="instrucoes"><span data-icon="doc"></span>Instruções<i class="nav-dot" id="dot-instrucoes"></i></a>
         <p class="nav-group">Acesso</p>
         <a class="nav-item" href="#usuarios" data-nav="usuarios"><span data-icon="users"></span>Login dos usuários<i class="nav-dot" id="dot-usuarios"></i></a>
+        <a class="nav-item" href="#banco" data-nav="banco"><span data-icon="database"></span>Banco de dados<i class="nav-dot" id="dot-banco"></i></a>
+        <a class="nav-item" href="#limites" data-nav="limites"><span data-icon="gauge"></span>Limites de uso<i class="nav-dot" id="dot-limites"></i></a>
       </nav>
 
       <div class="nav-foot">
@@ -242,6 +244,68 @@
               <p class="key-status" id="sb-status"></p>
               <button type="button" class="btn ghost danger small" id="sb-remove" hidden>Desligar login</button>
               <button type="submit" class="btn primary" id="sb-save">Testar e ativar</button>
+            </footer>
+          </form>
+        </section>
+
+        <!-- Banco de dados -->
+        <section class="page" data-page="banco" hidden>
+          <div class="panel-card">
+            <div class="panel-card-head">
+              <h2>Histórico na nuvem</h2>
+              <p>Com o banco ativo, as conversas ficam na conta de cada usuário e aparecem em qualquer aparelho. A KIRA passa a resumir o começo de conversas longas para não perder o contexto, cada usuário pode preencher a Personalização e os limites de uso passam a valer.</p>
+            </div>
+            <div class="panel-card-body">
+              <div class="current" id="db-state"></div>
+              <ol class="steps" id="db-steps" hidden>
+                <li>Abra o SQL Editor do seu projeto na Supabase.
+                  <div class="inline-actions"><a class="btn ghost small" id="db-editor" target="_blank" rel="noopener"><span data-icon="external"></span>Abrir o SQL Editor</a></div>
+                </li>
+                <li>Copie o SQL, cole no editor e clique em <b>Run</b>.
+                  <div class="inline-actions"><button type="button" class="btn ghost small" id="db-copy"><span data-icon="copy"></span>Copiar SQL</button></div>
+                </li>
+                <li>Volte aqui e clique em <b>Verificar</b>.</li>
+              </ol>
+              <details class="advanced" id="db-sql-box">
+                <summary>Ver o SQL</summary>
+                <pre class="preview" id="db-sql"></pre>
+              </details>
+              <div class="note">
+                <span data-icon="shield"></span>
+                <p>Só o servidor do KIRA grava no banco, com uma chave que fica no servidor (o banco guarda só a impressão digital dela). Cada usuário só consegue ler as próprias conversas. Rodar o SQL de novo não apaga dados.</p>
+              </div>
+            </div>
+            <footer class="panel-card-foot">
+              <p class="key-status" id="db-status"></p>
+              <button type="button" class="btn primary" id="db-check">Verificar</button>
+            </footer>
+          </div>
+        </section>
+
+        <!-- Limites de uso -->
+        <section class="page" data-page="limites" hidden>
+          <form class="panel-card" id="limits-form" autocomplete="off">
+            <div class="panel-card-head">
+              <h2>Mensagens por usuário</h2>
+              <p>Protegem a cota da sua IA contra abuso. Gerar uma resposta de novo também conta. Use 0 para não limitar.</p>
+            </div>
+            <div class="panel-card-body">
+              <div class="current" id="limits-state"></div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="limit-hour">Por hora</label>
+                  <input id="limit-hour" class="input" type="number" min="0" max="100000" step="1" inputmode="numeric" />
+                </div>
+                <div class="field">
+                  <label for="limit-day">Por dia (24 horas)</label>
+                  <input id="limit-day" class="input" type="number" min="0" max="100000" step="1" inputmode="numeric" />
+                </div>
+              </div>
+              <p class="help">Quem passa do limite vê a hora em que pode voltar a enviar. Os limites valem com o banco de dados ativo, onde o uso de cada conta fica registrado.</p>
+            </div>
+            <footer class="panel-card-foot">
+              <p class="key-status" id="limits-status"></p>
+              <button type="submit" class="btn primary" id="limits-save">Salvar</button>
             </footer>
           </form>
         </section>

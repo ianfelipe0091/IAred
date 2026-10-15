@@ -3,6 +3,8 @@
 //   "prompt" instruções do admin, um texto por escopo:
 //            { all: { text, updatedAt }, models: { [modelId]: { text, updatedAt } } }
 //            (o formato antigo { instructions, targets } é convertido ao carregar)
+//   "limits" limites de mensagens por usuário { perHour, perDay } (0 = sem limite)
+//   "db-key" chave do servidor para gravar no banco (o banco guarda só o SHA-256)
 //   "ai" / "free" formato antigo (IA principal / opção gratuita), migrados para "models" ao carregar.
 
 const CACHE_MS = 15_000;
@@ -32,8 +34,18 @@ const ai = kvEntry("ai");
 const free = kvEntry("free");
 const models = kvEntry("models");
 const prompt = kvEntry("prompt");
+const limits = kvEntry("limits");
 
 export const hasStorage = (env) => Boolean(env.CONFIG);
+
+// Limites por usuário (só valem com o histórico no banco, onde o uso de cada conta é registrado).
+export const DEFAULT_LIMITS = { perHour: 30, perDay: 150 };
+
+export async function loadLimits(env) {
+  return { ...DEFAULT_LIMITS, ...((await limits.load(env)) || {}) };
+}
+
+export const saveLimits = limits.save;
 
 export const saveModels = models.save;
 

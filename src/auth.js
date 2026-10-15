@@ -2,11 +2,13 @@
 import { AuthClient } from "@supabase/auth-js";
 
 let client = null;
+let cloudEnabled = false;
 
 export async function initAuth() {
   try {
     const res = await fetch("/api/auth/config");
     const config = await res.json();
+    cloudEnabled = Boolean(config.cloud);
     if (!config.enabled) return null;
     // Mesmos cabeçalhos que o supabase-js usa, sem carregar banco, storage e realtime.
     client = {
@@ -27,6 +29,9 @@ export async function initAuth() {
 
 export const authClient = () => client;
 
+// Histórico na conta (banco configurado pelo admin); senão, só neste navegador.
+export const historyInCloud = () => cloudEnabled;
+
 export async function currentUser() {
   if (!client) return null;
   const { data } = await client.auth.getSession();
@@ -34,11 +39,16 @@ export async function currentUser() {
 }
 
 // Cabeçalhos das chamadas à API, com o token de acesso quando há login.
+// Renova o token se faltar pouco para vencer: uma resposta longa não pode perder a sessão no meio.
 export async function apiHeaders() {
   const headers = { "content-type": "application/json" };
   if (client) {
-    const { data } = await client.auth.getSession();
-    if (data.session) headers.authorization = `Bearer ${data.session.access_token}`;
+    let { session } = (await client.auth.getSession()).data;
+    if (session && session.expires_at * 1000 - Date.now() < 10 * 60_000) {
+      const refreshed = await client.auth.refreshSession().catch(() => null);
+      session = refreshed?.data?.session || session;
+    }
+    if (session) headers.authorization = `Bearer ${session.access_token}`;
   }
   return headers;
 }
@@ -53,6 +63,8 @@ const MESSAGES = {
   email_address_invalid: "Email inválido.",
   over_request_rate_limit: "Muitas tentativas. Aguarde um pouco e tente de novo.",
   over_email_send_rate_limit: "Muitos emails enviados. Aguarde um pouco e tente de novo.",
+  same_password: "A nova senha precisa ser diferente da atual.",
+  otp_expired: "O link expirou ou já foi usado. Peça outro.",
 };
 
 export function describeAuthError(error) {

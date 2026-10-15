@@ -79,32 +79,46 @@ export async function testAuthConfig({ url, anonKey }) {
 const USER_CACHE_MS = 60_000;
 const users = new Map();
 
-async function getUser(request, config) {
-  const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") || "");
-  if (!match) return null;
-  const token = match[1];
+function bearer(request) {
+  return /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") || "")?.[1] || null;
+}
+
+async function getUser(token, config) {
   const hit = users.get(token);
   if (hit && Date.now() - hit.at < USER_CACHE_MS) return hit.user;
 
   const res = await fetch(`${config.url}/auth/v1/user`, {
     headers: { apikey: config.anonKey, authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10_000),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    if (res.status >= 500) throw new Error(`auth ${res.status}`);
+    return null;
+  }
   const data = await res.json();
-  const user = { id: data.id, email: data.email };
+  const user = { id: data.id, email: data.email, name: data.user_metadata?.name || "" };
   if (users.size > 1000) users.clear();
   users.set(token, { at: Date.now(), user });
   return user;
 }
 
+// Quem está chamando: { config, user, token } com login, { config } sem login obrigatório,
+// ou { response } com o erro a devolver (login obrigatório e usuário sem sessão válida).
+export async function authenticate(request, env) {
+  const config = await loadAuthConfig(env);
+  if (!config.enabled) return { config, user: null, token: null };
+  const token = bearer(request);
+  let user = null;
+  try {
+    if (token) user = await getUser(token, config);
+  } catch {
+    return { response: json({ error: "O serviço de login está indisponível. Tente de novo em instantes." }, 503) };
+  }
+  if (!user) return { response: json({ error: "Entre na sua conta para usar o KIRA.", auth: true }, 401) };
+  return { config, user, token };
+}
+
 // Devolve uma resposta de erro se o login for obrigatório e o usuário não estiver logado.
 export async function requireUser(request, env) {
-  const config = await loadAuthConfig(env);
-  if (!config.enabled) return null;
-  try {
-    if (await getUser(request, config)) return null;
-  } catch {
-    return json({ error: "O serviço de login está indisponível. Tente de novo em instantes." }, 503);
-  }
-  return json({ error: "Entre na sua conta para usar o KIRA.", auth: true }, 401);
+  return (await authenticate(request, env)).response || null;
 }

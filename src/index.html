@@ -23,7 +23,7 @@
       <img class="logo auth-logo" src="/favicon.svg?v=3" alt="" width="44" height="44" />
       <h1 id="auth-title">Entrar no KIRA</h1>
       <p class="auth-sub">Sua IA especialista em cibersegurança.</p>
-      <div class="auth-tabs" role="tablist">
+      <div class="auth-tabs" id="auth-tabs" role="tablist">
         <button type="button" role="tab" data-mode="login" class="active" aria-selected="true">Entrar</button>
         <button type="button" role="tab" data-mode="signup" aria-selected="false">Criar conta</button>
       </div>
@@ -34,19 +34,25 @@
           <input id="auth-name" class="plain" type="text" autocomplete="name" maxlength="80" />
         </div>
       </div>
-      <label class="field-label" for="auth-email">Email</label>
-      <div class="key-field">
-        <span data-icon="mail"></span>
-        <input id="auth-email" class="plain" type="email" autocomplete="email" autocapitalize="off" spellcheck="false" required />
+      <div id="auth-email-wrap">
+        <label class="field-label" for="auth-email">Email</label>
+        <div class="key-field">
+          <span data-icon="mail"></span>
+          <input id="auth-email" class="plain" type="email" autocomplete="email" autocapitalize="off" spellcheck="false" required />
+        </div>
       </div>
-      <label class="field-label" for="auth-password">Senha</label>
-      <div class="key-field">
-        <span data-icon="lock"></span>
-        <input id="auth-password" class="plain" type="password" autocomplete="current-password" minlength="8" required />
-        <button type="button" class="icon-btn" id="auth-toggle" aria-label="Mostrar senha" data-icon="eye"></button>
+      <div id="auth-password-wrap">
+        <label class="field-label" for="auth-password" id="auth-password-label">Senha</label>
+        <div class="key-field">
+          <span data-icon="lock"></span>
+          <input id="auth-password" class="plain" type="password" autocomplete="current-password" minlength="8" required />
+          <button type="button" class="icon-btn" id="auth-toggle" aria-label="Mostrar senha" data-icon="eye"></button>
+        </div>
       </div>
       <p class="key-status" id="auth-status"></p>
       <button type="submit" class="btn primary wide" id="auth-submit">Entrar</button>
+      <button type="button" class="auth-link" id="auth-forgot">Esqueci minha senha</button>
+      <button type="button" class="auth-link" id="auth-back" hidden>Voltar para entrar</button>
     </form>
   </div>
 
@@ -66,7 +72,6 @@
         <span class="sb-text">Nova conversa</span>
       </button>
 
-      <div class="sb-section sb-text">Recentes</div>
       <nav class="history" id="history"></nav>
 
       <button class="sb-settings" id="open-settings">
@@ -127,7 +132,20 @@
         <div id="model-section">
           <p class="field-label">Modelo de IA</p>
           <div class="plans" id="model-plans" role="radiogroup" aria-label="Modelo de IA"></div>
-          <p class="hint">A escolha vale para as próximas mensagens. O histórico fica salvo só neste navegador.</p>
+          <p class="hint">A escolha vale para as próximas mensagens.</p>
+        </div>
+
+        <div id="profile-section" hidden>
+          <p class="field-label">Personalização</p>
+          <div class="key-field">
+            <span data-icon="user"></span>
+            <input id="profile-name" class="plain" type="text" maxlength="80" autocomplete="name" placeholder="Como a KIRA deve te chamar" />
+          </div>
+          <textarea id="profile-about" class="area" rows="4" maxlength="4000" placeholder="O que a KIRA deve saber sobre você? Ex.: sou analista de SOC numa empresa de saúde, uso Microsoft Sentinel e prefiro respostas objetivas com os comandos."></textarea>
+          <div class="profile-bar">
+            <p class="hint" id="profile-hint">Vale para todas as suas conversas.</p>
+            <button type="button" class="btn ghost small" id="profile-save">Salvar</button>
+          </div>
         </div>
 
         <div id="account" hidden>
@@ -138,6 +156,8 @@
             <button type="button" class="btn ghost small" id="sign-out">Sair</button>
           </div>
         </div>
+
+        <p class="hint" id="history-hint">O histórico fica salvo só neste navegador.</p>
       </div>
 
       <footer class="modal-foot">
